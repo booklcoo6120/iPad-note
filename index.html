@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="手寫筆記">
+<title>手寫筆記</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* VOICE: quiet, tool-like, out of the way of the writing
+   IDEA: a stack of paper notebooks on a warm desk
+   PICTURE: the page itself is the picture, everything else recedes
+   COLOUR and TYPE: warm desk grey, off-white paper, one fountain-pen blue; system CJK sans
+   LAYOUT: one toolbar row, full-bleed page, floating page pill */
+:root{--desk:#e7e4de;--bar:#fbfaf7;--ink:#1d1d1f;--mut:#6c6b70;--line:#dcd8d0;--acc:#2448c8;--accs:rgba(36,72,200,.12);--pop:#fff;--sh:0 10px 34px rgba(30,25,15,.18);--danger:#c62828}
+html[data-night]{--desk:#111214;--bar:#1b1c1f;--ink:#ececee;--mut:#9b9ba2;--line:#2d2e33;--acc:#8ea6ff;--accs:rgba(142,166,255,.16);--pop:#232428;--sh:0 10px 34px rgba(0,0,0,.55);--danger:#ff6b6b}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{background:var(--desk);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+input[type=text]{-webkit-user-select:text;user-select:text}
+.view{position:fixed;inset:0;display:flex;flex-direction:column}
+svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ib{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;transition:background .15s}
+.ib:active{background:var(--accs)}
+.ib.on{background:var(--accs);color:var(--acc)}
+.ib:disabled{opacity:.28;pointer-events:none}
+.btn{height:44px;padding:0 18px;border-radius:12px;background:var(--acc);color:#fff;font-weight:600;white-space:nowrap}
+html[data-night] .btn{color:#10131f}
+html[data-night] .btn.ghost{color:var(--acc)}
+.btn.ghost{background:var(--accs);color:var(--acc)}
+.btn.danger{background:var(--danger);color:#fff}
+/* home */
+.hbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:max(18px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 14px max(20px,env(safe-area-inset-left))}
+.hbar h1{font-size:30px;line-height:1.1;margin:0 auto 0 0;letter-spacing:.01em}
+.hact{display:flex;gap:8px;align-items:center}
+#grid{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px max(20px,env(safe-area-inset-right)) 40px max(20px,env(safe-area-inset-left));display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:26px 20px;align-content:start}
+.nb{display:flex;flex-direction:column;gap:8px}
+.cover{position:relative;aspect-ratio:3/4;border-radius:4px 10px 10px 4px;background:#fffefb;box-shadow:0 1px 2px rgba(0,0,0,.12),0 8px 22px rgba(40,30,10,.14);overflow:hidden;display:block;width:100%}
+.cover::before{content:"";position:absolute;left:0;top:0;bottom:0;width:9px;background:var(--spine);z-index:1}
+.cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+.cover:active{transform:scale(.98)}
+.meta{display:flex;align-items:flex-start;gap:4px}
+.meta div{flex:1}
+.meta b{display:block;font-size:15px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta small{color:var(--mut);font-size:13px}
+.meta .ib{width:36px;height:36px;margin-top:-4px}
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--mut)}
+.empty h2{color:var(--ink);font-size:22px;margin:0 0 6px}
+.tip{margin:0;padding:10px max(20px,env(safe-area-inset-left)) max(14px,env(safe-area-inset-bottom));font-size:13px;color:var(--mut);text-align:center}
+.warn{margin:0 20px 10px;padding:10px 14px;border-radius:12px;background:#fde7e7;color:#8a1c1c;font-size:14px}
+/* editor */
+.bar{display:flex;align-items:center;gap:2px;padding:4px max(8px,env(safe-area-inset-right)) 4px max(8px,env(safe-area-inset-left));padding-top:max(4px,env(safe-area-inset-top));background:var(--bar);border-bottom:1px solid var(--line);flex-wrap:wrap;position:relative;z-index:5}
+.title{height:44px;padding:0 8px;font-weight:600;max-width:30vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:10px}
+.grow{flex:1}
+.grp{display:flex;align-items:center;gap:2px}
+.sep{width:1px;height:26px;background:var(--line);margin:0 6px;flex:none}
+.swb{width:44px;height:44px;display:grid;place-items:center;flex:none}
+.swb i{width:24px;height:24px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18),0 0 0 2px var(--bar),0 0 0 3.5px var(--line)}
+.swb.none{visibility:hidden}
+#saveWarn{margin:0;border-radius:0;font-size:14px;padding:8px 14px}
+.savest{font-size:12px;color:var(--mut);white-space:nowrap;padding:0 4px}
+.savest.error{color:#fff;background:var(--danger);border-radius:8px;padding:2px 8px;font-weight:600}
+#stage{flex:1;position:relative;overflow:hidden;touch-action:none;background:var(--desk)}
+#stage canvas{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;pointer-events:none}
+.pill{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:3px;border-radius:16px;background:var(--bar);box-shadow:var(--sh);z-index:4}
+.pill span{min-width:64px;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;color:var(--mut)}
+.pill .ib{width:40px;height:40px}
+#selbar{position:fixed;z-index:6;display:flex;gap:2px;padding:4px;border-radius:14px;background:var(--bar);box-shadow:var(--sh)}
+#selbar button{height:38px;padding:0 12px;border-radius:10px;font-size:15px;white-space:nowrap}
+#selbar button:active{background:var(--accs)}
+#selbar .d{color:var(--danger)}
+#selbar .acc{color:var(--acc);font-weight:600}
+#selbar.area .ink{display:none}
+#selbar{flex-wrap:wrap;max-width:calc(100vw - 16px);justify-content:center}
+#quick{position:fixed;z-index:35;background:var(--pop);border-radius:20px;box-shadow:var(--sh);padding:10px;width:252px;transform-origin:50% 100%;animation:qin .14s ease-out}
+@keyframes qin{from{opacity:0;transform:scale(.9)}}
+#quick .qr{display:flex;justify-content:space-between;gap:4px}
+#quick .qc{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin:10px 2px 4px}
+#quick .qp{width:100%;height:40px;margin-top:8px;border-radius:12px;background:var(--accs);color:var(--acc);font-weight:600}
+#quick .qe{float:right;color:var(--acc);font-size:12px;font-weight:600;padding:0 4px}
+.dlg{max-height:calc(100vh - 40px);overflow:auto}
+.qed small{display:block;font-size:12px;color:var(--mut);margin:4px 2px}
+.qed .qrow{display:grid;grid-template-columns:repeat(7,1fr);gap:9px;margin:6px 2px 12px}
+.qmv{display:flex;gap:8px;margin:0 0 12px}.qmv .btn{flex:1;height:40px;padding:0}
+#quick small{display:block;font-size:12px;color:var(--mut);margin:8px 4px 0}
+/* drawer */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(260px,80vw);background:var(--bar);box-shadow:var(--sh);z-index:20;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right)}
+.dh{display:flex;align-items:center;padding:6px 6px 6px 16px;border-bottom:1px solid var(--line)}
+.dh b{flex:1}
+#dlist{flex:1;overflow:auto;padding:14px 22px;display:flex;flex-direction:column;gap:16px}
+.pg{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.th{width:100%;background:#fffefb;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.18);overflow:hidden}
+.th img{width:100%;height:100%;display:block;object-fit:cover}
+.pg.cur .th{outline:3px solid var(--acc);outline-offset:2px}
+.pg span{font-size:13px;color:var(--mut)}
+.dact{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:8px;border-top:1px solid var(--line);padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.dact button{height:52px;border-radius:10px;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.dact button svg{width:20px;height:20px}
+.dact button:active{background:var(--accs)}
+.dact .wide{grid-column:1/-1;flex-direction:row;font-size:15px;height:44px;background:var(--accs);color:var(--acc);font-weight:600}
+/* popover */
+#pop{position:fixed;z-index:30;background:var(--pop);border-radius:16px;box-shadow:var(--sh);padding:12px;width:min(300px,calc(100vw - 16px));max-height:calc(100vh - 80px);overflow:auto}
+.ph{font-weight:700;font-size:15px;margin:2px 4px 10px}
+.hint{font-size:13px;color:var(--mut);margin:6px 4px;line-height:1.5}
+.cols{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:12px}
+.cdot{aspect-ratio:1;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);position:relative;display:block}
+.cdot.on::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2.5px solid var(--acc)}
+.cdot.custom{background:conic-gradient(red,#ff0,lime,cyan,blue,#f0f,red);overflow:hidden;cursor:pointer}
+.cdot.custom input{opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+.sl{display:flex;align-items:center;gap:10px;font-size:14px;margin:4px 4px 8px}
+.sl input{flex:1;accent-color:var(--acc);height:32px}
+.sl output{width:30px;text-align:right;font-variant-numeric:tabular-nums;color:var(--mut)}
+#pPrev{width:100%;height:44px;display:block;border-radius:10px;background:var(--desk)}
+.seg{display:flex;background:var(--desk);border-radius:12px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;height:38px;border-radius:9px;font-size:14px;white-space:nowrap}
+.seg button.on{background:var(--pop);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
+.mi{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:6px 8px;border-radius:10px;text-align:left;font-size:15px}
+.mi:active{background:var(--accs)}
+.mi span{flex:1}
+.mi small{display:block;font-size:12px;color:var(--mut);line-height:1.35}
+.mi.d{color:var(--danger)}
+.hr{height:1px;background:var(--line);margin:6px 0}
+input.tg{appearance:none;-webkit-appearance:none;width:50px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;transition:background .2s;margin:0;cursor:pointer}
+input.tg::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+input.tg:checked{background:var(--acc)}
+input.tg:checked::after{transform:translateX(20px)}
+/* modal etc */
+#modal{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:grid;place-items:center;padding:20px}
+.dlg{background:var(--pop);border-radius:18px;padding:20px;width:min(380px,100%);box-shadow:var(--sh)}
+.dlg h3{margin:0 0 6px;font-size:18px}
+.dlg p{margin:0 0 12px;color:var(--mut);font-size:15px}
+.dlg input{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--desk);color:var(--ink);padding:0 12px;font-size:16px;margin:6px 0 14px}
+.dlg .row{display:flex;gap:8px;justify-content:flex-end}
+.dlg img{max-width:100%;max-height:60vh;display:block;margin:0 auto 12px;-webkit-touch-callout:default}
+#toast{position:fixed;left:50%;top:max(70px,calc(env(safe-area-inset-top) + 60px));transform:translate(-50%,-20px);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#busy{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.4);display:grid;place-items:center}
+#busy>div{background:var(--pop);border-radius:16px;padding:20px 22px;width:min(320px,86vw)}
+#busy p{margin:0 0 12px;font-size:15px}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+@media (max-width:700px){
+ .title{max-width:40vw}
+ .bar .sep{display:none}
+ .hbar h1{font-size:24px;width:100%}
+ #grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:20px 14px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+ <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L15.8 4.8a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z"/><path d="M13.5 7l3.5 3.5"/></symbol>
+ <symbol id="i-hl" viewBox="0 0 24 24"><path d="M9 15l-3 3v2h4l2-2"/><path d="M9 15l7.5-10.5 3 3L9 15z"/><path d="M7.5 13.5l3 3"/><path d="M4 21h16" opacity=".5"/></symbol>
+ <symbol id="i-er" viewBox="0 0 24 24"><path d="M8.5 19.5L3.8 14.8a1.8 1.8 0 010-2.6l8.4-8.4a1.8 1.8 0 012.6 0l5 5a1.8 1.8 0 010 2.6l-8.3 8.1z"/><path d="M8.5 19.5H20"/><path d="M8 8.5l7.5 7.5"/></symbol>
+ <symbol id="i-lasso" viewBox="0 0 24 24"><path d="M7 17.5C4.6 16.4 3 14.4 3 12c0-4.4 4-7.5 9-7.5s9 3.1 9 7.5-4 7.5-9 7.5c-1 0-1.9-.1-2.8-.3" stroke-dasharray="2.6 2.6"/><path d="M7 17.5c-.8 1.2-.5 2.7 1 3.3"/></symbol>
+ <symbol id="i-img" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 2.5-2.5L20 19"/></symbol>
+ <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 010 10h-2"/></symbol>
+ <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 7l4.5 4.5L15 16"/><path d="M19 11.5h-9a5 5 0 000 10h2"/></symbol>
+ <symbol id="i-pages" viewBox="0 0 24 24"><rect x="4" y="3.5" width="11" height="14" rx="1.5"/><path d="M9 20.5h9.5a1.5 1.5 0 001.5-1.5V8"/></symbol>
+ <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></symbol>
+ <symbol id="i-l" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+ <symbol id="i-r" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+ <symbol id="i-fs" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+ <symbol id="i-fsx" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+ <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+ <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+ <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></symbol>
+</svg>
+
+<div id="home" class="view">
+ <header class="hbar">
+  <h1>我的筆記本</h1>
+  <div class="hact">
+   <button class="btn" id="hNew">新筆記本</button>
+   <button class="btn ghost" id="hPdf">匯入 PDF</button>
+   <button class="ib" id="hMore" aria-label="更多"><svg class="i"><use href="#i-more"/></svg></button>
+  </div>
+ </header>
+ <p id="storeWarn" class="warn" hidden>目前無法使用 iPad 的儲存空間，寫的筆記只會暫存。請完全關閉 App（從多工畫面往上滑掉）再重新打開。</p>
+ <p id="bakWarn" class="warn" hidden style="background:#fff4d6;color:#6b4e00"></p>
+ <main id="grid"></main>
+ <p class="tip">筆記只存在這台裝置的瀏覽器裡。建議在 Safari 點「分享 → 加入主畫面」使用，並定期從右上角「⋯ → 備份」保存。</p>
+</div>
+
+<div id="editor" class="view" hidden>
+ <div class="bar" id="tbar">
+  <button class="ib" id="bBack" aria-label="回到筆記本列表"><svg class="i"><use href="#i-back"/></svg></button>
+  <button class="title" id="bTitle">筆記本</button><span id="saveSt" class="savest ok">已儲存</span>
+  <div class="grow"></div>
+  <div class="grp">
+   <button class="ib tool" data-t="pen" aria-label="鋼筆"><svg class="i"><use href="#i-pen"/></svg></button>
+   <button class="ib tool" data-t="hl" aria-label="螢光筆"><svg class="i"><use href="#i-hl"/></svg></button>
+   <button class="ib tool" data-t="eraser" aria-label="橡皮擦"><svg class="i"><use href="#i-er"/></svg></button>
+   <button class="ib tool" data-t="lasso" aria-label="套索"><svg class="i"><use href="#i-lasso"/></svg></button>
+   <button class="swb" id="bSw" aria-label="顏色與粗細"><i></i></button>
+   <button class="ib" id="bImg" aria-label="插入圖片"><svg class="i"><use href="#i-img"/></svg></button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp">
+   <button class="ib" id="bUndo" aria-label="復原"><svg class="i"><use href="#i-undo"/></svg></button>
+   <button class="ib" id="bRedo" aria-label="重做"><svg class="i"><use href="#i-redo"/></svg></button>
+   <div class="sep"></div>
+   <button class="ib" id="bFs" aria-label="全螢幕"><svg class="i"><use href="#i-fs"/></svg></button>
+   <button class="ib" id="bPages" aria-label="頁面"><svg class="i"><use href="#i-pages"/></svg></button>
+   <button class="ib" id="bMore" aria-label="更多"><svg class="i"><use href="#i-more"/></svg></button>
+  </div>
+ </div>
+ <div id="saveWarn" class="warn" hidden>筆記目前沒有存進 iPad（已先暫存）。請先不要關閉 App，按右上角「⋯」匯出 PDF 或回首頁備份；如果一直出現，請完全關閉 App 再打開。</div>
+ <div id="stage"><canvas id="cv0"></canvas><canvas id="cv1"></canvas></div>
+ <div class="pill float">
+  <button class="ib" id="bPrev" aria-label="上一頁"><svg class="i"><use href="#i-l"/></svg></button>
+  <span id="pnum">1 / 1</span>
+  <button class="ib" id="bNext" aria-label="下一頁"><svg class="i"><use href="#i-r"/></svg></button>
+  <button class="ib" id="bAdd" aria-label="新增頁面"><svg class="i"><use href="#i-plus"/></svg></button>
+ </div>
+ <div id="selbar" class="float" hidden>
+  <button data-a="shot" class="acc">截圖</button><button data-a="copy" class="ink">拷貝</button><button data-a="cut" class="ink">剪下</button><button data-a="color" class="ink">顏色</button><button data-a="del" class="d ink">刪除</button><button data-a="done">完成</button>
+ </div>
+ <aside id="drawer" hidden>
+  <div class="dh"><b>頁面</b><button class="ib" id="dClose" aria-label="關閉"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div id="dlist"></div>
+  <div class="dact">
+   <button id="dUp"><svg class="i"><use href="#i-up"/></svg>上移</button>
+   <button id="dDown"><svg class="i"><use href="#i-down"/></svg>下移</button>
+   <button id="dDup"><svg class="i"><use href="#i-copy"/></svg>複製</button>
+   <button id="dDel"><svg class="i"><use href="#i-trash"/></svg>刪除</button>
+   <button id="dAdd" class="wide">新增頁面</button>
+  </div>
+ </aside>
+</div>
+
+<div id="pop" hidden></div>
+<div id="quick" class="float" hidden></div>
+<div id="modal" hidden></div>
+<div id="busy" hidden><div><p id="busyT"></p><div class="prog"><i id="busyP"></i></div></div></div>
+<div id="toast" role="status"></div>
+<input type="file" id="fImg" accept="image/*" hidden>
+<input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
+<input type="file" id="fBak" accept=".json,application/json" hidden>
+
+<script>
+{
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const now=()=>performance.now();
+const r2=v=>Math.round(v*100)/100;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PDFCDN='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const PEN_C=['#1d1d1f','#5f6368','#ffffff','#2448c8','#0a84ff','#00a6c8','#0f766e','#2a9d4b','#f2b705','#e85d04','#d62828','#c2185b','#7b2cbf'];
+const HL_C=['#ffe14d','#b6f36b','#7fe3ff','#ff9ecb','#ffb35c','#c9a7ff'];
+const PAPERS=[['blank','空白'],['lined','橫線'],['grid','方格'],['dot','點陣']];
+
+/* ---------- settings ---------- */
+const LS='inkbook.settings';
+const S={scroll:'h',qpen:null,qhl:null,quick:true,night:null,pencilOnly:false,pencilAuto:true,invertPdf:true,paper:'lined',tool:'pen',pen:{c:'#1d1d1f',s:3},hl:{c:'#ffe14d',s:20},er:{s:20,mode:'stroke'}};
+try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k in o){if(S[k]&&typeof S[k]==='object')Object.assign(S[k],o[k]);else S[k]=o[k]}}catch(e){}
+if(!S.v2){S.v2=true;try{if(navigator.maxTouchPoints>0){S.pencilOnly=true}}catch(e){}}
+if(S.night==null){try{S.night=matchMedia('(prefers-color-scheme: dark)').matches}catch(e){S.night=false}}
+const saveS=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
+saveS();
+
+/* ---------- storage ---------- */
+const DB={db:null,mem:null,
+ openOnce(ms){return new Promise((res,rej)=>{let done=false;const r=indexedDB.open('inkbook',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('nbs',{keyPath:'id'});d.createObjectStore('pages',{keyPath:'id'}).createIndex('nb','nb');d.createObjectStore('blobs')};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{if(DB.db===d)DB.db=null};d.onversionchange=()=>{d.close();if(DB.db===d)DB.db=null};if(done){d.close();return}done=true;res(d)};r.onerror=()=>{done=true;rej(r.error)};setTimeout(()=>{if(!done){done=true;rej(new Error('timeout'))}},ms)})},
+ async open(){for(const ms of [8000,12000,20000]){try{this.db=await this.openOnce(ms);return true}catch(e){}}this.mem={nbs:new Map,pages:new Map,blobs:new Map};return false},
+ async tx(st,mode,fn){for(let i=0;;i++){try{if(!this.db)this.db=await this.openOnce(12000);return await this._tx(st,mode,fn)}catch(e){if(i>=2)throw e;try{this.db&&this.db.close()}catch(_){}this.db=null;await new Promise(r=>setTimeout(r,300*(i+1)))}}},
+ _tx(st,mode,fn){return new Promise((res,rej)=>{const t=this.db.transaction(st,mode),r=fn(t.objectStore(st));let out;if(r)r.onsuccess=()=>{out=r.result};t.oncomplete=()=>res(out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'))})},
+ get(st,k){return this.mem?Promise.resolve(this.mem[st].get(k)):this.tx(st,'readonly',s=>s.get(k))},
+ put(st,v,k){if(this.mem){this.mem[st].set(k===undefined?v.id:k,v);return Promise.resolve()}return this.tx(st,'readwrite',s=>k===undefined?s.put(v):s.put(v,k))},
+ del(st,k){if(this.mem){this.mem[st].delete(k);return Promise.resolve()}return this.tx(st,'readwrite',s=>s.delete(k))},
+ all(st){return this.mem?Promise.resolve([...this.mem[st].values()]):this.tx(st,'readonly',s=>s.getAll())},
+ keys(st){return this.mem?Promise.resolve([...this.mem[st].keys()]):this.tx(st,'readonly',s=>s.getAllKeys())},
+ pagesOf(nb){return this.mem?Promise.resolve([...this.mem.pages.values()].filter(p=>p.nb===nb)):this.tx('pages','readonly',s=>s.index('nb').getAll(nb))}
+};
+
+/* ---------- ui helpers ---------- */
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2600)}
+function busy(t,p){const b=$('#busy');if(t==null){b.hidden=true;return}b.hidden=false;$('#busyT').textContent=t;$('#busyP').style.width=Math.round((p||0)*100)+'%'}
+function modal({title,text='',input=null,ok='確定',cancel='取消',danger=false,html=''}){return new Promise(res=>{const m=$('#modal');m.innerHTML=`<div class="dlg"><h3></h3>${text?'<p></p>':''}${html}${input!==null?'<input id="mIn" type="text" maxlength="60" enterkeyhint="done">':''}<div class="row">${cancel?`<button class="btn ghost" data-v="0">${cancel}</button>`:''}<button class="btn ${danger?'danger':''}" data-v="1">${ok}</button></div></div>`;m.querySelector('h3').textContent=title;if(text)m.querySelector('p').textContent=text;const inp=m.querySelector('#mIn');if(inp)inp.value=input;m.hidden=false;if(inp)setTimeout(()=>{inp.focus();inp.select()},60);const done=v=>{m.hidden=true;m.innerHTML='';res(v)};m.onclick=e=>{const b=e.target.closest('button[data-v]');if(b)done(b.dataset.v==='1'?(inp?inp.value.trim():true):null);else if(e.target===m)done(null)};if(inp)inp.onkeydown=e=>{if(e.key==='Enter')done(inp.value.trim())}})}
+const pop=$('#pop');let popFor=null;
+function openPop(anchor,html,bind){if(popFor===anchor){closePop();return}pop.innerHTML=html;pop.hidden=false;popFor=anchor;const r=anchor.getBoundingClientRect(),pw=pop.offsetWidth,ph=pop.offsetHeight;let x=clamp(r.left+r.width/2-pw/2,8,innerWidth-pw-8),y=r.bottom+8;if(y+ph>innerHeight-8)y=Math.max(8,r.top-ph-8);pop.style.left=x+'px';pop.style.top=y+'px';if(bind)bind(pop)}
+function closePop(){pop.hidden=true;pop.innerHTML='';popFor=null}
+document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!(popFor&&popFor.contains(e.target)))closePop()},true);
+function toBlob(c,t,q){return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('畫布轉檔失敗')),t,q))}
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s)})}
+function b64(buf){const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+function unb64(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer}
+const safeName=s=>(s||'筆記').replace(/[\\/:*?"<>|]/g,'_').slice(0,80);
+const fmtDate=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`};
+
+/* ---------- downloads ---------- */
+let DL=null;
+(async()=>{for(let i=0;i<40&&!(window.claude&&typeof window.claude.use==='function');i++)await new Promise(r=>setTimeout(r,250));try{if(window.claude&&typeof window.claude.use==='function')DL=await window.claude.use('downloads')}catch(e){DL=null}})();
+async function saveFile(name,blob){
+ if(DL){try{await DL.save({filename:name,data:blob});toast('已匯出：'+name);return true}catch(e){const c=e&&e.code;if(c==='declined'){toast('已取消匯出');return false}if(c==='rate_limited'){toast('請稍候再試一次');return false}if(c==='too_large'){toast('檔案太大，無法匯出');return false}}}
+ try{const file=new File([blob],name,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return true}}catch(e){if(e&&e.name==='AbortError'){toast('已取消匯出');return false}}
+ try{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),120000)}catch(e){}
+ if(blob.type.startsWith('image/')){const url=URL.createObjectURL(blob);await modal({title:'長按圖片即可儲存',html:`<img src="${url}" alt="匯出的頁面">`,ok:'關閉',cancel:''});URL.revokeObjectURL(url)}
+ else toast('如果沒有開始下載，表示目前的環境不支援下載');
+ return false}
+
+/* ---------- image cache ---------- */
+const imgCache=new Map();
+function getImg(key){let e=imgCache.get(key);if(e)return e.img;e={img:null,url:null,inv:null,wait:[]};imgCache.set(key,e);
+ DB.get('blobs',key).then(r=>{if(!r){e.wait.forEach(f=>f(null));e.wait=[];return}e.url=URL.createObjectURL(new Blob([r.buf],{type:r.type}));const im=new Image();im.onload=()=>{e.img=im;e.wait.forEach(f=>f(im));e.wait=[];for(const p of pages)if(p._cache&&keysOf(p).includes(key))dropCache(p);if(pg)scheduleRender()};im.onerror=()=>{e.wait.forEach(f=>f(null));e.wait=[]};im.src=e.url}).catch(()=>{});return null}
+function loadImgP(key){const e=imgCache.get(key);if(e&&e.img)return Promise.resolve(e.img);getImg(key);return new Promise(res=>{const x=imgCache.get(key);if(x.img)res(x.img);else x.wait.push(res)})}
+function getInv(key){const e=imgCache.get(key);if(!e||!e.img)return null;if(!e.inv){const c=document.createElement('canvas');c.width=e.img.naturalWidth;c.height=e.img.naturalHeight;const g=c.getContext('2d');g.drawImage(e.img,0,0);const d=g.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const r=a[i],gg=a[i+1],b=a[i+2],mx=r>gg?(r>b?r:b):(gg>b?gg:b),mn=r<gg?(r<b?r:b):(gg<b?gg:b),o=255-mx-mn;a[i]=30+(r+o)*0.86;a[i+1]=30+(gg+o)*0.86;a[i+2]=30+(b+o)*0.86}g.putImageData(d,0,0);e.inv=c}return e.inv}
+function evictExcept(keep){for(const [k,e] of imgCache){if(keep.has(k))continue;if(e.wait.length)continue;if(e.url)URL.revokeObjectURL(e.url);if(e.inv)e.inv.width=0;imgCache.delete(k)}}
+const keysOf=p=>[p.bg,...(p.images||[]).map(i=>i.key)].filter(Boolean);
+
+/* ---------- strokes ---------- */
+const penR=(s,p)=>Math.max(0.3,s*(0.2+1.1*p))/2;
+function bboxOf(st){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const p=st.p;for(let i=0;i<p.length;i+=3){const x=p[i],y=p[i+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}const pad=(st.t==='hl'?st.s/2:penR(st.s,1))+1;return [x0-pad,y0-pad,x1+pad,y1+pad]}
+function nc(c,night){if(!night)return c;const n=parseInt(c.slice(1),16),L=(0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255;return L<0.22?'#ececee':c}
+function penPath(ctx,p,s,from){const n=p.length/3;for(let i=Math.max(0,from);i<n;i++){const x=p[i*3],y=p[i*3+1],r=penR(s,p[i*3+2]);ctx.moveTo(x+r,y);ctx.arc(x,y,r,0,Math.PI*2);if(i>0){const px=p[i*3-3],py=p[i*3-2],pr=penR(s,p[i*3-1]),dx=x-px,dy=y-py,L=Math.hypot(dx,dy);if(L>0.01){const nx=-dy/L,ny=dx/L;ctx.moveTo(px+nx*pr,py+ny*pr);ctx.lineTo(px-nx*pr,py-ny*pr);ctx.lineTo(x-nx*r,y-ny*r);ctx.lineTo(x+nx*r,y+ny*r);ctx.closePath()}}}}
+function drawStroke(ctx,st,night){const p=st.p;if(!p.length)return;if(st.t==='hl'){ctx.save();ctx.globalCompositeOperation=night?'source-over':'multiply';ctx.globalAlpha=night?0.42:0.8;ctx.strokeStyle=st.c;ctx.lineWidth=st.s;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(p[0],p[1]);if(p.length===3)ctx.lineTo(p[0]+0.01,p[1]);for(let i=3;i<p.length;i+=3)ctx.lineTo(p[i],p[i+1]);ctx.stroke();ctx.restore();return}ctx.fillStyle=nc(st.c,night);ctx.beginPath();penPath(ctx,p,st.s,0);ctx.fill('nonzero')}
+function drawPaper(ctx,p,night){if(p.paper==='blank'||!p.paper)return;ctx.save();ctx.strokeStyle=night?'rgba(255,255,255,.13)':'rgba(60,100,160,.22)';ctx.fillStyle=night?'rgba(255,255,255,.3)':'rgba(60,80,120,.4)';ctx.lineWidth=1.1;ctx.beginPath();const g=40;
+ if(p.paper==='lined'){for(let y=110;y<p.h-20;y+=44){ctx.moveTo(0,y);ctx.lineTo(p.w,y)}ctx.stroke()}
+ else if(p.paper==='grid'){for(let x=g;x<p.w;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,p.h)}for(let y=g;y<p.h;y+=g){ctx.moveTo(0,y);ctx.lineTo(p.w,y)}ctx.stroke()}
+ else if(p.paper==='dot'){for(let x=g;x<p.w;x+=g)for(let y=g;y<p.h;y+=g){ctx.moveTo(x+1.7,y);ctx.arc(x,y,1.7,0,Math.PI*2)}ctx.fill()}
+ ctx.restore()}
+function drawContent(ctx,p,night,vis,sx){
+ if(p.bg){const im=getImg(p.bg);if(im)ctx.drawImage(night&&S.invertPdf?(getInv(p.bg)||im):im,0,0,p.w,p.h)}
+ drawPaper(ctx,p,night);
+ for(const im of p.images){if(sx&&sx.imgs.has(im))continue;const i=getImg(im.key);if(i)ctx.drawImage(i,im.x,im.y,im.w,im.h);else{ctx.fillStyle='rgba(128,128,128,.15)';ctx.fillRect(im.x,im.y,im.w,im.h)}}
+ for(const st of p.strokes){if(sx&&sx.strokes.has(st))continue;const b=st.b;if(vis&&(b[2]<vis.x0||b[0]>vis.x1||b[3]<vis.y0||b[1]>vis.y1))continue;drawStroke(ctx,st,night)}}
+
+/* ---------- state ---------- */
+let nb=null,pages=[],pg=null,cur=0,sel=null,act=null,cursor=null;
+const dirty=new Set();let saveT=null;
+function ser(p){return {id:p.id,nb:p.nb,w:p.w,h:p.h,paper:p.paper,bg:p.bg,strokes:p.strokes.map(s=>({t:s.t,c:s.c,s:s.s,p:s.p})),images:p.images.map(i=>({id:i.id,key:i.key,x:i.x,y:i.y,w:i.w,h:i.h})),thumb:p.thumb||null}}
+function deser(r){return {...r,strokes:(r.strokes||[]).map(s=>{const n={t:s.t,c:s.c,s:s.s,p:s.p};n.b=bboxOf(n);return n}),images:(r.images||[]).map(i=>({...i}))}}
+function newPage(paper){return {id:uid(),nb:nb.id,w:1000,h:1414,paper:paper||S.paper,bg:null,strokes:[],images:[],thumb:null}}
+function markDirty(p){p=p||pg;if(!p)return;p._ver=(p._ver||0)+1;dirty.add(p);if(saveState==='ok')setSave('saving');p._td=true;clearTimeout(saveT);saveT=setTimeout(flush,800)}
+let flushing=Promise.resolve();
+const RK='inkbook.rescue.';
+function rescue(key,obj){try{localStorage.setItem(RK+key,JSON.stringify(obj))}catch(e){}}
+function unrescue(key){try{localStorage.removeItem(RK+key)}catch(e){}}
+let saveState='ok';
+function setSave(st){saveState=st;const el=$('#saveSt');if(el){el.textContent=st==='ok'?'已儲存':st==='saving'?'儲存中…':'未儲存';el.className='savest '+st}const w=$('#saveWarn');if(w)w.hidden=!(st==='error'||DB.mem)}
+function flush(){clearTimeout(saveT);flushing=flushing.then(async()=>{const list=[...dirty];if(!list.length&&!nb)return;dirty.clear();let failed=false;if(list.length)setSave('saving');
+ for(const p of list){if(p._td){try{p.thumb=makeThumb(p)}catch(e){}p._td=false}const r=ser(p);try{await DB.put('pages',r);if(DB.mem)rescue('p.'+p.id,{...r,thumb:null});else unrescue('p.'+p.id)}catch(e){failed=true;dirty.add(p);rescue('p.'+p.id,{...r,thumb:null})}}
+ if(nb&&pages.length){nb.updated=Date.now();nb.pageIds=pages.map(x=>x.id);nb.cover=pages[0].thumb||nb.cover||null;const n={...nb};try{await DB.put('nbs',n);if(DB.mem)rescue('n.'+n.id,{...n,cover:null});else unrescue('n.'+n.id)}catch(e){failed=true;rescue('n.'+n.id,{...n,cover:null})}}
+ if(failed){setSave('error');clearTimeout(saveT);saveT=setTimeout(flush,3000)}else setSave('ok')});return flushing}
+async function recoverRescue(){if(DB.mem)return 0;let n=0;const keys=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(RK))keys.push(k)}}catch(e){return 0}
+ for(const k of keys.filter(k=>k.startsWith(RK+'p.'))){try{const r=JSON.parse(localStorage.getItem(k));const old=await DB.get('pages',r.id);await DB.put('pages',{...r,thumb:old&&old.thumb||null});localStorage.removeItem(k);n++}catch(e){}}
+ for(const k of keys.filter(k=>k.startsWith(RK+'n.'))){try{const r=JSON.parse(localStorage.getItem(k));const old=await DB.get('nbs',r.id);const ids=[...r.pageIds];if(old)for(const id of old.pageIds||[])if(!ids.includes(id))ids.push(id);await DB.put('nbs',{...(old||{}),...r,pageIds:ids,cover:old&&old.cover||null});localStorage.removeItem(k)}catch(e){}}
+ return n}
+function makeThumb(p){if(p.bg&&!(imgCache.get(p.bg)&&imgCache.get(p.bg).img))return p.thumb;const W=180,c=document.createElement('canvas');c.width=W;c.height=Math.round(W*p.h/p.w);const g=c.getContext('2d');g.fillStyle='#fffefb';g.fillRect(0,0,c.width,c.height);g.scale(W/p.w,W/p.w);drawContent(g,p,false,null,null);const u=c.toDataURL('image/jpeg',0.72);c.width=0;return u}
+
+/* ---------- canvas & camera ---------- */
+const stage=$('#stage'),cv0=$('#cv0'),cv1=$('#cv1'),bx=cv0.getContext('2d'),lx=cv1.getContext('2d');
+let dpr=1,SW=0,SH=0,SR={left:0,top:0,right:0,bottom:0},fitS=1,docH=1414;
+let cam={s:1,tx:0,ty:0};
+const GAP=28,vMode=()=>S.scroll==='v';
+function layout(){if(vMode()){let y=0;for(const p of pages){p._oy=y;y+=p.h+GAP}docH=Math.max(1,y-GAP)}else{for(const p of pages)p._oy=0;docH=pg?pg.h:1414}}
+function visPages(){if(!pg)return [];if(!vMode())return [pg];const y0=-cam.ty/cam.s,y1=(SH-cam.ty)/cam.s;return pages.filter(p=>p._oy+p.h>=y0&&p._oy<=y1)}
+function pageAtY(y){if(!vMode())return pg;let b=pages[0];for(const p of pages){if(y>=p._oy-GAP/2)b=p;else break}return b}
+function focusAt(clientY){if(!vMode()||!pg)return;const p=pageAtY((clientY-SR.top-cam.ty)/cam.s);if(p&&p!==pg){if(sel)sel=null;pg=p;cur=pages.indexOf(p);nb.last=cur;syncUI();render()}}
+function updateCur(){if(!vMode()||act||sel||!pg)return;const p=pageAtY((SH*0.45-cam.ty)/cam.s);if(p&&p!==pg){pg=p;cur=pages.indexOf(p);nb.last=cur;syncUI();if(!$('#drawer').hidden)renderDrawer()}}
+function resize(){const r=stage.getBoundingClientRect();SR=r;SW=r.width;SH=r.height;if(!SW||!SH)return;dpr=Math.min(2,window.devicePixelRatio||1);for(const c of [cv0,cv1]){c.width=Math.round(SW*dpr);c.height=Math.round(SH*dpr)}if(pg){layout();clampCam();render()}}
+new ResizeObserver(resize).observe(stage);
+function fit(){if(!pg||!SW)return;fitS=Math.min((SW-24)/pg.w,900/pg.w);cam={s:fitS,tx:(SW-pg.w*fitS)/2,ty:14-(pg._oy||0)*fitS};clampCam()}
+const clampS=s=>clamp(s,fitS*0.5,fitS*6);
+function clampCam(){if(!pg)return;const pw=pg.w*cam.s,ph=docH*cam.s,m=40;cam.tx=pw<=SW?(SW-pw)/2:clamp(cam.tx,SW-pw-m,m);cam.ty=ph<=SH-70?Math.max(14,(SH-70-ph)/2):clamp(cam.ty,SH-ph-90,m)}
+function setCam(ctx,p){p=p||pg;ctx.setTransform(dpr*cam.s,0,0,dpr*cam.s,dpr*cam.tx,dpr*(cam.ty+(p._oy||0)*cam.s))}
+let rq=0,lq=0,fq=0,idleT=0,inertia=0;
+function scheduleRender(){if(!rq)rq=requestAnimationFrame(()=>{rq=0;render()})}
+function liveQ(){if(!lq)lq=requestAnimationFrame(()=>{lq=0;drawLive()})}
+function frame(){if(!fq)fq=requestAnimationFrame(()=>{fq=0;draw(true);placeSelBar()});clearTimeout(idleT);idleT=setTimeout(()=>{if(!gest&&!inertia)render()},160)}
+function paperCol(night){return night?'#26272b':'#fffefb'}
+const capOf=p=>Math.sqrt(5e6/(p.w*p.h));
+function buildCache(p,sc){let c=p._cache;if(!c){c=p._cache={canvas:document.createElement('canvas')}}const W=Math.max(1,Math.round(p.w*sc)),H=Math.max(1,Math.round(p.h*sc));if(c.canvas.width!==W||c.canvas.height!==H){c.canvas.width=W;c.canvas.height=H}const g=c.canvas.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle=paperCol(S.night);g.fillRect(0,0,W,H);g.setTransform(W/p.w,0,0,H/p.h,0,0);drawContent(g,p,S.night,null,null);c.s=W/p.w;c.ver=p._ver||0;c.night=S.night;c.inv=S.invertPdf;return c}
+function cacheOk(p){const c=p._cache;return c&&c.canvas.width&&c.ver===(p._ver||0)&&c.night===S.night&&c.inv===S.invertPdf}
+function dropCache(p){if(p._cache){p._cache.canvas.width=0;p._cache=null}}
+function draw(fast){bx.setTransform(1,0,0,1,0,0);bx.clearRect(0,0,cv0.width,cv0.height);if(!pg||!SW)return;const need=cam.s*dpr;
+ for(const p of visPages()){setCam(bx,p);const k=1/cam.s;bx.fillStyle=S.night?'rgba(0,0,0,.5)':'rgba(40,30,10,.12)';bx.fillRect(1.5*k,4*k,p.w,p.h);bx.fillStyle=paperCol(S.night);bx.fillRect(0,0,p.w,p.h);
+  const direct=p===pg&&(sel||(act&&act.kind==='erase'));
+  if(!direct){const cap=capOf(p),want=Math.min(need,cap);if(!cacheOk(p)||(!fast&&p._cache.s<want*0.97))buildCache(p,want);if(fast||p._cache.s>=need*0.97){bx.drawImage(p._cache.canvas,0,0,p.w,p.h);continue}}
+  bx.save();bx.beginPath();bx.rect(0,0,p.w,p.h);bx.clip();drawContent(bx,p,S.night,{x0:-cam.tx/cam.s,y0:-cam.ty/cam.s-p._oy,x1:(SW-cam.tx)/cam.s,y1:(SH-cam.ty)/cam.s-p._oy},p===pg?sel:null);bx.restore()}
+ drawLive()}
+function render(){if(rq){cancelAnimationFrame(rq);rq=0}draw(false);placeSelBar();if(pg){const vis=visPages(),keep=new Set(),near=new Set();for(const p of vis){const i=pages.indexOf(p);for(const q of [pages[i-1],p,pages[i+1]])if(q)near.add(q)}for(const p of pages)if(!near.has(p)&&p._cache)dropCache(p);for(const p of near)for(const k of keysOf(p))keep.add(k);evictExcept(keep)}}
+function stopInertia(){if(inertia){cancelAnimationFrame(inertia);inertia=0}}
+function startInertia(vx,vy){let last=now();const step=()=>{const t=now(),dt=Math.min(40,t-last);last=t;cam.tx+=vx*dt;cam.ty+=vy*dt;const f=Math.pow(0.94,dt/16);vx*=f;vy*=f;const b={...cam};clampCam();if(cam.ty!==b.ty)vy=0;if(cam.tx!==b.tx)vx=0;updateCur();draw(true);placeSelBar();if(Math.hypot(vx,vy)<0.03){inertia=0;render();return}inertia=requestAnimationFrame(step)};inertia=requestAnimationFrame(step)}
+function commitCam(){clampCam();render()}
+function selXform(ctx){ctx.translate(sel.ax+sel.dx,sel.ay+sel.dy);ctx.scale(sel.sc,sel.sc);ctx.translate(-sel.ax,-sel.ay)}
+function selRect(){const b=sel.box;return {x0:b[0]+sel.dx,y0:b[1]+sel.dy,x1:b[0]+sel.dx+(b[2]-b[0])*sel.sc,y1:b[1]+sel.dy+(b[3]-b[1])*sel.sc}}
+function drawLive(){if(lq){cancelAnimationFrame(lq);lq=0}lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,cv1.width,cv1.height);if(!pg||!SW)return;setCam(lx,pg);const k=1/cam.s;
+ lx.save();lx.beginPath();lx.rect(0,0,pg.w,pg.h);lx.clip();
+ if(act&&act.kind==='draw')drawStroke(lx,act.st,S.night);
+ if(sel){lx.save();selXform(lx);for(const im of pg.images)if(sel.imgs.has(im)){const i=getImg(im.key);if(i)lx.drawImage(i,im.x,im.y,im.w,im.h)}for(const st of pg.strokes)if(sel.strokes.has(st))drawStroke(lx,st,S.night);lx.restore()}
+ lx.restore();
+ if(sel){const r=selRect();lx.save();lx.strokeStyle=S.night?'#8ea6ff':'#2448c8';lx.lineWidth=1.5*k;lx.setLineDash([6*k,4*k]);lx.strokeRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);lx.setLineDash([]);lx.beginPath();lx.arc(r.x1,r.y1,9*k,0,Math.PI*2);lx.fillStyle=lx.strokeStyle;lx.fill();lx.lineWidth=2.5*k;lx.strokeStyle='#fff';lx.stroke();lx.restore()}
+ if(act&&act.kind==='lasso'&&act.path.length>2){const p=act.path;lx.save();lx.beginPath();lx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)lx.lineTo(p[i],p[i+1]);lx.fillStyle=S.night?'rgba(142,166,255,.08)':'rgba(36,72,200,.06)';lx.fill();lx.strokeStyle=S.night?'#8ea6ff':'#2448c8';lx.lineWidth=1.6*k;lx.setLineDash([5*k,4*k]);lx.stroke();lx.restore()}
+ if(cursor&&S.tool==='eraser'){lx.save();lx.beginPath();lx.arc(cursor.x,cursor.y,S.er.s/2,0,Math.PI*2);lx.fillStyle=S.night?'rgba(255,255,255,.08)':'rgba(0,0,0,.05)';lx.fill();lx.strokeStyle=S.night?'rgba(255,255,255,.6)':'rgba(0,0,0,.45)';lx.lineWidth=1.2*k;lx.stroke();lx.restore()}}
+
+/* ---------- history ---------- */
+const snapshot=()=>({strokes:pg.strokes.slice(),images:pg.images.slice()});
+let HU=[],HR=[];
+function pushUndo(s){HU.push({p:pg,s});if(HU.length>200)HU.shift();HR.length=0;syncUndo()}
+function histStep(from,to){if(!pg||act)return;let e;while((e=from.pop())&&!pages.includes(e.p));if(!e)return syncUndo();const p=e.p;to.push({p,s:{strokes:p.strokes.slice(),images:p.images.slice()}});p.strokes=e.s.strokes;p.images=e.s.images;sel=null;if(p!==pg){pg=p;cur=pages.indexOf(p);if(vMode()){const top=(p._oy)*cam.s+cam.ty;if(top>SH*0.8||top+p.h*cam.s<SH*0.1){cam.ty=14-p._oy*cam.s;clampCam()}}else{goPage(cur)}}markDirty(p);render();syncUI()}
+function undo(){histStep(HU,HR)}
+function redo(){histStep(HR,HU)}
+function syncUndo(){$('#bUndo').disabled=!HU.length;$('#bRedo').disabled=!HR.length}
+
+/* ---------- geometry ---------- */
+function segD(px,py,ax,ay,bx2,by){const dx=bx2-ax,dy=by-ay,L=dx*dx+dy*dy;let t=L?((px-ax)*dx+(py-ay)*dy)/L:0;t=clamp(t,0,1);return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
+function pip(x,y,poly){let c=false;for(let i=0,j=poly.length-2;i<poly.length;j=i,i+=2){const xi=poly[i],yi=poly[i+1],xj=poly[j],yj=poly[j+1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c}return c}
+function densify(p,md){const o=[p[0],p[1],p[2]];for(let i=3;i<p.length;i+=3){const x0=p[i-3],y0=p[i-2],q0=p[i-1],x1=p[i],y1=p[i+1],q1=p[i+2],n=Math.max(1,Math.ceil(Math.hypot(x1-x0,y1-y0)/md));for(let k=1;k<=n;k++){const t=k/n;o.push(x0+(x1-x0)*t,y0+(y1-y0)*t,q0+(q1-q0)*t)}}return o}
+function hitStroke(st,smp,R){const p=st.p,n=p.length/3;for(const q of smp){if(n===1){if(Math.hypot(q.x-p[0],q.y-p[1])<R)return true;continue}for(let i=3;i<p.length;i+=3)if(segD(q.x,q.y,p[i-3],p[i-2],p[i],p[i+1])<R)return true}return false}
+
+/* ---------- erase ---------- */
+function eraseAt(a,b){const r=S.er.s/2,d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(d/(r*0.5))),smp=[];for(let i=0;i<=n;i++)smp.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});
+ const mx0=Math.min(a.x,b.x)-r,my0=Math.min(a.y,b.y)-r,mx1=Math.max(a.x,b.x)+r,my1=Math.max(a.y,b.y)+r;let changed=false;const out=[];
+ for(const st of pg.strokes){const bb=st.b;if(bb[2]<mx0||bb[0]>mx1||bb[3]<my0||bb[1]>my1){out.push(st);continue}
+  const hw=st.t==='hl'?st.s/2:penR(st.s,0.5),R=r+hw;
+  if(!hitStroke(st,smp,R)){out.push(st);continue}changed=true;
+  if(S.er.mode==='stroke')continue;
+  const p=densify(st.p,Math.max(0.8,R/3)),runs=[];let run=[];
+  for(let i=0;i<p.length;i+=3){let gone=false;for(const q of smp)if(Math.hypot(p[i]-q.x,p[i+1]-q.y)<R){gone=true;break}if(gone){if(run.length)runs.push(run);run=[]}else run.push(r2(p[i]),r2(p[i+1]),p[i+2])}
+  if(run.length)runs.push(run);
+  for(const rp of runs){if(rp.length<6)continue;const ns={t:st.t,c:st.c,s:st.s,p:rp};ns.b=bboxOf(ns);out.push(ns)}}
+ if(changed){pg.strokes=out;act.changed=true;scheduleRender()}}
+
+/* ---------- selection ---------- */
+function selBox(){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const st of sel.strokes){const b=st.b;x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3])}for(const im of sel.imgs){x0=Math.min(x0,im.x);y0=Math.min(y0,im.y);x1=Math.max(x1,im.x+im.w);y1=Math.max(y1,im.y+im.h)}return [x0,y0,x1,y1]}
+const selEmpty=()=>!sel.strokes.size&&!sel.imgs.size;
+function makeSel(ss,ii,box){sel={strokes:ss,imgs:ii,dx:0,dy:0,sc:1};sel.box=box||selBox();sel.ax=sel.box[0];sel.ay=sel.box[1];render()}
+function clearSel(){if(!sel)return;sel=null;render()}
+function finishLasso(poly){if(poly.length<8)return;const ss=new Set(),ii=new Set();
+ for(const st of pg.strokes){const p=st.p,n=p.length/3,step=Math.max(1,Math.floor(n/30));let a=0,t=0;for(let i=0;i<n;i+=step){t++;if(pip(p[i*3],p[i*3+1],poly))a++}if(a/t>=0.5)ss.add(st)}
+ for(const im of pg.images)if(pip(im.x+im.w/2,im.y+im.h/2,poly))ii.add(im);
+ if(ss.size||ii.size){makeSel(ss,ii);return}let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let i=0;i<poly.length;i+=2){x0=Math.min(x0,poly[i]);x1=Math.max(x1,poly[i]);y0=Math.min(y0,poly[i+1]);y1=Math.max(y1,poly[i+1])}x0=Math.max(0,x0);y0=Math.max(0,y0);x1=Math.min(pg.w,x1);y1=Math.min(pg.h,y1);if(x1-x0>15&&y1-y0>15){makeSel(ss,ii,[x0,y0,x1,y1]);toast('沒有圈到筆跡，可以截取這個範圍的圖')}}
+function applySel(snap){if(sel.dx===0&&sel.dy===0&&sel.sc===1){render();return}if(selEmpty()){const r=selRect();makeSel(sel.strokes,sel.imgs,[r.x0,r.y0,r.x1,r.y1]);return}pushUndo(snap);const ax=sel.ax,ay=sel.ay,dx=sel.dx,dy=sel.dy,k=sel.sc,ns=new Set(),ni=new Set();
+ pg.strokes=pg.strokes.map(st=>{if(!sel.strokes.has(st))return st;const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(ax+(p[i]-ax)*k+dx);p[i+1]=r2(ay+(p[i+1]-ay)*k+dy)}const n={t:st.t,c:st.c,s:r2(st.s*k),p};n.b=bboxOf(n);ns.add(n);return n});
+ pg.images=pg.images.map(im=>{if(!sel.imgs.has(im))return im;const n={...im,x:ax+(im.x-ax)*k+dx,y:ay+(im.y-ay)*k+dy,w:im.w*k,h:im.h*k};ni.add(n);return n});
+ makeSel(ns,ni);markDirty()}
+function hitSel(e){if(!sel)return null;const r=selRect(),ex=e.clientX-SR.left,ey=e.clientY-SR.top,X=x=>x*cam.s+cam.tx,Y=y=>(y+pg._oy)*cam.s+cam.ty;if(Math.hypot(ex-X(r.x1),ey-Y(r.y1))<28)return 'handle';if(ex>=X(r.x0)-12&&ex<=X(r.x1)+12&&ey>=Y(r.y0)-12&&ey<=Y(r.y1)+12)return 'inside';return null}
+const selbar=$('#selbar');
+function placeSelBar(){if(!sel||act||$('#editor').hidden){selbar.hidden=true;return}selbar.classList.toggle('area',selEmpty());const r=selRect(),X=x=>SR.left+x*cam.s+cam.tx,Y=y=>SR.top+(y+pg._oy)*cam.s+cam.ty;selbar.hidden=false;const bw=selbar.offsetWidth,bh=selbar.offsetHeight;const x=clamp((X(r.x0)+X(r.x1))/2-bw/2,8,innerWidth-bw-8);let y=Y(r.y0)-bh-14;if(y<SR.top+6)y=Math.min(Y(r.y1)+20,SR.bottom-bh-70);selbar.style.left=x+'px';selbar.style.top=Math.max(SR.top+6,y)+'px'}
+selbar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sel)return;const a=b.dataset.a;
+ if(a==='done'){clearSel();return}
+ if(a==='del'){pushUndo(snapshot());pg.strokes=pg.strokes.filter(s=>!sel.strokes.has(s));pg.images=pg.images.filter(i=>!sel.imgs.has(i));sel=null;render();markDirty();return}
+ if(a==='shot'){doShot();return}
+ if(a==='copy'){copySel();toast('已拷貝，單指點一下畫面選「貼上」');return}
+ if(a==='cut'){copySel();pushUndo(snapshot());pg.strokes=pg.strokes.filter(s=>!sel.strokes.has(s));pg.images=pg.images.filter(i=>!sel.imgs.has(i));sel=null;render();markDirty();toast('已剪下，單指點一下畫面選「貼上」');return}
+ if(a==='color'){if(!sel.strokes.size){toast('圖片無法更換顏色');return}openPop(b,`<div class="ph">更換筆跡顏色</div><div class="cols">${[...PEN_C,...HL_C].map(c=>`<button class="cdot" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}</div>`,el=>{el.onclick=ev=>{const d=ev.target.closest('[data-c]');if(!d)return;pushUndo(snapshot());const ns=new Set();pg.strokes=pg.strokes.map(st=>{if(!sel.strokes.has(st))return st;const n={...st,c:d.dataset.c};ns.add(n);return n});makeSel(ns,sel.imgs);markDirty();closePop()}})}});
+
+/* ---------- clipboard & screenshot ---------- */
+let CLIP=null;try{CLIP=JSON.parse(localStorage.getItem('inkbook.clip')||'null')}catch(e){}
+function setClip(c){if(CLIP&&CLIP.tmp&&CLIP.tmp!==c.tmp)DB.del('blobs',CLIP.tmp).catch(()=>{});CLIP=c;try{localStorage.setItem('inkbook.clip',JSON.stringify(CLIP))}catch(e){}}
+function copySel(){const b=sel.box;setClip({box:[b[0],b[1],b[2],b[3]],strokes:pg.strokes.filter(s=>sel.strokes.has(s)).map(s=>({t:s.t,c:s.c,s:s.s,p:s.p})),images:pg.images.filter(i=>sel.imgs.has(i)).map(i=>({key:i.key,x:i.x,y:i.y,w:i.w,h:i.h}))})}
+async function pasteSystem(px,py){try{const items=await navigator.clipboard.read();for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){const b=await it.getType(t);await insertImageFile(new File([b],'paste',{type:t}),{x:px,y:py});return}}toast('剪貼簿裡沒有圖片')}catch(e){toast('無法讀取剪貼簿，請改用「貼上」')}}
+async function pasteAt(px,py){if(!CLIP||!pg)return;const b=CLIP.box,w=b[2]-b[0],h=b[3]-b[1];let ox=clamp(px-w/2,0,Math.max(0,pg.w-w))-b[0],oy=clamp(py-h/2,0,Math.max(0,pg.h-h))-b[1];
+ const ni=new Set(),ns=new Set();for(const im of CLIP.images){const r=await DB.get('blobs',im.key);if(!r)continue;const key=uid();await DB.put('blobs',{type:r.type,buf:r.buf},key);await loadImgP(key);ni.add({id:uid(),key,x:im.x+ox,y:im.y+oy,w:im.w,h:im.h})}
+ for(const st of CLIP.strokes){const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(p[i]+ox);p[i+1]=r2(p[i+1]+oy)}const n={t:st.t,c:st.c,s:st.s,p};n.b=bboxOf(n);ns.add(n)}
+ if(!ns.size&&!ni.size){toast('沒有可以貼上的內容');return}pushUndo(snapshot());pg.images.push(...ni);pg.strokes.push(...ns);setTool('lasso');makeSel(ns,ni);placeSelBar();markDirty()}
+async function shotBlob(){const r=selRect(),pad=12,x0=Math.max(0,r.x0-pad),y0=Math.max(0,r.y0-pad),x1=Math.min(pg.w,r.x1+pad),y1=Math.min(pg.h,r.y1+pad),k=Math.min(2.5,4000/Math.max(x1-x0,y1-y0));
+ for(const key of keysOf(pg))await loadImgP(key);const c=document.createElement('canvas');c.width=Math.max(1,Math.round((x1-x0)*k));c.height=Math.max(1,Math.round((y1-y0)*k));const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);g.setTransform(k,0,0,k,-x0*k,-y0*k);g.fillStyle='#fffefb';g.fillRect(0,0,pg.w,pg.h);drawContent(g,pg,false,null,null);const b=await toBlob(c,'image/png');c.width=0;b._box=[x0,y0,x1,y1];return b}
+async function showShot(blob){const url=URL.createObjectURL(blob);const v=await modal({title:'截圖',text:'長按圖片可以「拷貝」或「加入照片」。',html:`<img src="${url}" alt="截圖">`,ok:'儲存圖片',cancel:'關閉'});URL.revokeObjectURL(url);if(v)saveFile(safeName(nb.name)+'-截圖.png',blob)}
+async function shotToClip(b){try{const key=uid();await DB.put('blobs',{type:'image/png',buf:await b.arrayBuffer()},key);const [x0,y0,x1,y1]=b._box;setClip({box:[x0,y0,x1,y1],strokes:[],images:[{key,x:x0,y:y0,w:x1-x0,h:y1-y0}],tmp:key})}catch(e){}}
+function doShot(){const p=shotBlob();p.then(shotToClip,()=>{});let tried=false;try{if(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem){tried=true;navigator.clipboard.write([new ClipboardItem({'image/png':p})]).then(()=>toast('已複製截圖：可以貼到 ChatGPT，也能在筆記上單指點一下選「貼上」'),async()=>{try{showShot(await p)}catch(e){toast('截圖失敗')}})}}catch(e){tried=false}if(!tried)p.then(showShot,()=>toast('截圖失敗'))}
+document.addEventListener('paste',async e=>{if($('#editor').hidden||!pg)return;const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));if(!it)return;e.preventDefault();const f=it.getAsFile();if(f)insertImageFile(f)});
+
+/* ---------- input ---------- */
+let quickClosedAt=-1e9;
+const T=new Map(),ignored=new Set();let gest=null,penDown=false,penUpAt=0;
+const toPage=e=>({x:(e.clientX-SR.left-cam.tx)/cam.s,y:(e.clientY-SR.top-cam.ty)/cam.s-(pg._oy||0)});
+const prs=e=>e.pointerType==='pen'?clamp(e.pressure||0.05,0.02,1):0.5;
+const cen=pts=>{let x=0,y=0;for(const p of pts){x+=p.x;y+=p.y}return {x:x/pts.length,y:y/pts.length}};
+function gRef(){const pts=[...T.values()];gest.ref={cam:{...cam},c:cen(pts),d:pts.length>1?Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y):0}}
+function addTouch(id,x,y){T.set(id,{x,y});stopInertia();if(!gest)gest={cam0:{...cam},t0:now(),moved:false,maxN:0,x:x,y:y,hist:[]};gest.maxN=Math.max(gest.maxN,T.size);gRef()}
+function moveTouch(e){const t=T.get(e.pointerId);t.x=e.clientX;t.y=e.clientY;const pts=[...T.values()],r=gest.ref,c=cen(pts);
+ if(!S.pencilOnly&&pts.length<2)return;
+ const d=pts.length>1?Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y):0;
+ if(!gest.moved){if(Math.hypot(c.x-r.c.x,c.y-r.c.y)<10&&Math.abs(d-r.d)<10)return;gest.moved=true;closePop()}
+ const s=pts.length>1&&r.d>0?clampS(r.cam.s*d/r.d):r.cam.s,k=s/r.cam.s;
+ cam.s=s;cam.tx=(c.x-SR.left)-((r.c.x-SR.left)-r.cam.tx)*k;cam.ty=(c.y-SR.top)-((r.c.y-SR.top)-r.cam.ty)*k;clampCam();const tn=now();gest.hist.push({t:tn,x:cam.tx,y:cam.ty,n:pts.length});while(gest.hist.length>2&&tn-gest.hist[0].t>90)gest.hist.shift();updateCur();frame()}
+function endTouch(id){T.delete(id);if(!gest)return;if(T.size){gRef();return}const g=gest;gest=null;if(!g.moved&&now()-g.t0<320){if(g.maxN===2)undo();else if(g.maxN===3)redo();else if(g.maxN===1&&S.pencilOnly&&S.quick&&g.t0-quickClosedAt>150)showQuick(g.x,g.y)}
+ if(g.moved&&g.hist.length>1){const h=g.hist,a=h[0],b=h[h.length-1],dt=now()-a.t;if(dt>0&&dt<140&&b.n===1){const vx=(b.x-a.x)/dt,vy=(b.y-a.y)/dt;if(Math.hypot(vx,vy)>0.25){startInertia(vx,vy);return}}}commitCam()}
+function startAct(e){try{stage.setPointerCapture(e.pointerId)}catch(_){}stopInertia();focusAt(e.clientY);const q=toPage(e);
+ act={id:e.pointerId,pointer:e.pointerType,t0:now(),snap:snapshot(),cx:e.clientX,cy:e.clientY};closePop();
+ if(S.tool==='lasso'){const h=hitSel(e);if(h==='handle'){act.kind='scale';act.k0=sel.sc;act.A={x:sel.ax+sel.dx,y:sel.ay+sel.dy};act.d0=Math.max(1,Math.hypot(q.x-act.A.x,q.y-act.A.y))}else if(h==='inside'){act.kind='move';act.q0=q;act.d={x:sel.dx,y:sel.dy}}else{if(sel){sel=null;render()}act.kind='lasso';act.path=[q.x,q.y]}placeSelBar();drawLive();return}
+ if(sel){sel=null;render()}
+ if(S.tool==='eraser'){act.kind='erase';act.last=q;act.changed=false;cursor=q;eraseAt(q,q);liveQ();return}
+ const hl=S.tool==='hl',cfg=hl?S.hl:S.pen,p=prs(e);act.kind='draw';act.st={t:hl?'hl':'pen',c:cfg.c,s:cfg.s,p:[r2(q.x),r2(q.y),r2(p)]};act.sx=q.x;act.sy=q.y;act.sp=p;drawLive()}
+function addPt(q,p){const st=act.st,a=st.p,n=a.length;act.sx+=(q.x-act.sx)*0.55;act.sy+=(q.y-act.sy)*0.55;act.sp+=(p-act.sp)*0.45;if(Math.hypot(act.sx-a[n-3],act.sy-a[n-2])*cam.s<0.8)return;a.push(r2(act.sx),r2(act.sy),r2(act.sp));
+ if(st.t==='pen'){setCam(lx,pg);lx.fillStyle=nc(st.c,S.night);lx.beginPath();penPath(lx,a,st.s,a.length/3-1);lx.fill('nonzero')}else liveQ()}
+function moveAct(e){const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];const list=evs.length?evs:[e];act.cx=e.clientX;act.cy=e.clientY;
+ for(const ev of list){const q=toPage(ev);
+  if(act.kind==='draw')addPt(q,prs(ev));
+  else if(act.kind==='erase'){eraseAt(act.last,q);act.last=q;cursor=q}
+  else if(act.kind==='lasso'){const p=act.path,n=p.length;if(Math.hypot(q.x-p[n-2],q.y-p[n-1])*cam.s>2)p.push(q.x,q.y)}
+  else if(act.kind==='move'){sel.dx=act.d.x+q.x-act.q0.x;sel.dy=act.d.y+q.y-act.q0.y}
+  else if(act.kind==='scale'){sel.sc=Math.max(0.05,act.k0*Math.hypot(q.x-act.A.x,q.y-act.A.y)/act.d0)}}
+ if(act.kind!=='draw')liveQ()}
+function endAct(e){const a=act;act=null;clearTimeout(a.lpT);
+ if(a.kind==='draw'){const q=toPage(e),st=a.st,p=st.p;if(e.type!=='pointercancel'&&Math.hypot(q.x-p[p.length-3],q.y-p[p.length-2])*cam.s>0.5)p.push(r2(q.x),r2(q.y),r2(a.sp));st.b=bboxOf(st);pushUndo(a.snap);pg.strokes.push(st);const ok=cacheOk(pg);markDirty();if(ok){const c=pg._cache,g=c.canvas.getContext('2d');g.setTransform(c.canvas.width/pg.w,0,0,c.canvas.height/pg.h,0,0);g.save();g.beginPath();g.rect(0,0,pg.w,pg.h);g.clip();drawStroke(g,st,c.night);g.restore();c.ver=pg._ver}render();return}
+ if(a.kind==='erase'){if(a.changed){pushUndo(a.snap);markDirty()}if(a.pointer!=='pen')cursor=null;render();return}
+ if(a.kind==='lasso'){finishLasso(a.path);drawLive();placeSelBar();return}
+ if(a.kind==='move'||a.kind==='scale'){applySel(a.snap);placeSelBar()}}
+function cancelAct(){const a=act;if(!a)return;act=null;clearTimeout(a.lpT);pg.strokes=a.snap.strokes;pg.images=a.snap.images;if(sel){sel.dx=0;sel.dy=0;sel.sc=1}cursor=null;render()}
+const isFloat=t=>t.closest&&t.closest('.float');
+stage.addEventListener('pointerdown',e=>{if(!pg||isFloat(e.target))return;SR=stage.getBoundingClientRect();const id=e.pointerId;
+ if(e.pointerType==='pen'){stopInertia();
+  if(!S.pencilOnly&&S.pencilAuto){S.pencilOnly=true;saveS();toast('偵測到 Apple Pencil，已開啟防手掌誤觸')}
+  if(gest){if(now()-gest.t0<1500)cam={...gest.cam0};gest=null;for(const k of T.keys())ignored.add(k);T.clear();commitCam()}
+  if(act)cancelAct();penDown=true;startAct(e);return}
+ if(e.pointerType==='touch'){
+  if(penDown||now()-penUpAt<350||(e.width>140&&e.height>140)){ignored.add(id);return}
+  if(act&&act.pointer==='touch'){const a=act;cancelAct();addTouch(a.id,a.cx,a.cy);addTouch(id,e.clientX,e.clientY);return}
+  if(act){ignored.add(id);return}
+  if(!T.size&&!gest){if(S.pencilOnly){if(S.tool==='lasso'&&hitSel(e)){startAct(e);return}}else{startAct(e);return}}
+  addTouch(id,e.clientX,e.clientY);return}
+ if(e.button!==0||act)return;startAct(e)});
+stage.addEventListener('pointermove',e=>{const id=e.pointerId;if(ignored.has(id))return;
+ if(act&&act.id===id){moveAct(e);return}
+ if(T.has(id)&&gest){moveTouch(e);return}
+ if(!act&&e.pointerType==='pen'&&S.tool==='eraser'&&pg){cursor=toPage(e);liveQ()}});
+function up(e){const id=e.pointerId;if(e.pointerType==='pen'){penDown=false;penUpAt=now()}if(ignored.has(id)){ignored.delete(id);return}
+ if(act&&act.id===id){endAct(e);return}if(T.has(id))endTouch(id)}
+stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);
+stage.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!act&&cursor){cursor=null;liveQ()}});
+for(const ev of ['touchstart','touchmove'])stage.addEventListener(ev,e=>{if(!isFloat(e.target))e.preventDefault()},{passive:false});
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('dblclick',e=>e.preventDefault());
+stage.addEventListener('wheel',e=>{e.preventDefault();if(!pg||act)return;if(e.ctrlKey||e.metaKey){const s=clampS(cam.s*Math.exp(-e.deltaY*0.01)),mx=e.clientX-SR.left,my=e.clientY-SR.top;cam.tx=mx-(mx-cam.tx)*s/cam.s;cam.ty=my-(my-cam.ty)*s/cam.s;cam.s=s}else{cam.tx-=e.deltaX;cam.ty-=e.deltaY}stopInertia();clampCam();updateCur();frame()},{passive:false});
+document.addEventListener('keydown',e=>{if($('#editor').hidden||e.target.tagName==='INPUT')return;const k=e.key.toLowerCase();if((e.metaKey||e.ctrlKey)&&k==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if((e.metaKey||e.ctrlKey)&&k==='y'){e.preventDefault();redo()}else if((e.metaKey||e.ctrlKey)&&k==='c'&&sel&&!selEmpty()){e.preventDefault();copySel();toast('已拷貝')}else if((e.metaKey||e.ctrlKey)&&k==='x'&&sel&&!selEmpty()){e.preventDefault();selbar.querySelector('[data-a=cut]').click()}else if((e.metaKey||e.ctrlKey)&&k==='v'&&CLIP){e.preventDefault();pasteAt((SW/2-cam.tx)/cam.s,(SH/2-cam.ty)/cam.s-pg._oy)}else if((k==='backspace'||k==='delete')&&sel&&!selEmpty()){selbar.querySelector('[data-a=del]').click()}else if(k==='escape')clearSel()});
+
+/* ---------- tools ui ---------- */
+function setTool(t){if(sel&&t!=='lasso'){sel=null;render()}S.tool=t;cursor=null;saveS();syncUI();drawLive()}
+function syncUI(){$$('.tool').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tool));const cfg=S.tool==='pen'?S.pen:S.tool==='hl'?S.hl:null,sw=$('#bSw');sw.classList.toggle('none',!cfg);if(cfg)sw.style.setProperty('--c',nc(cfg.c,S.night));$('#pnum').textContent=`${cur+1} / ${pages.length}`;$('#bPrev').disabled=cur<=0;$('#bNext').disabled=cur>=pages.length-1;syncUndo()}
+function drawPrev(){const c=$('#pPrev');if(!c)return;const t=S.tool,cfg=t==='hl'?S.hl:S.pen,W=c.clientWidth||270,H=c.clientHeight||44,d=Math.min(2,devicePixelRatio||1);c.width=W*d;c.height=H*d;const g=c.getContext('2d');g.scale(d,d);const p=[];for(let i=0;i<=60;i++){const x=16+(W-32)*i/60;p.push(x,H/2+Math.sin(i/60*Math.PI*2)*H*0.22,t==='hl'?0.5:0.15+0.7*Math.sin(i/60*Math.PI))}g.fillStyle=paperCol(S.night);g.fillRect(0,0,W,H);drawStroke(g,{t:t==='hl'?'hl':'pen',c:cfg.c,s:cfg.s,p},S.night)}
+function toolPop(anchor){const t=S.tool;
+ if(t==='lasso'){openPop(anchor,`<div class="ph">套索</div><p class="hint">用筆圈起筆跡或圖片。選取後可以拖曳移動、拉右下角的圓點縮放，也能換顏色、複製或刪除。</p>`);return}
+ if(t==='eraser'){openPop(anchor,`<div class="ph">橡皮擦</div><div class="seg"><button data-m="stroke" class="${S.er.mode==='stroke'?'on':''}">整筆擦除</button><button data-m="pixel" class="${S.er.mode==='pixel'?'on':''}">局部擦除</button></div><label class="sl">大小<input type="range" id="pS" min="6" max="80" value="${S.er.s}"><output>${S.er.s}</output></label><div class="hr"></div><button class="mi d" id="pClr"><span>清除這一頁的筆跡和圖片</span></button>`,el=>{
+  el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.er.mode=b.dataset.m;saveS();el.querySelectorAll('[data-m]').forEach(x=>x.classList.toggle('on',x===b))});
+  const s=el.querySelector('#pS');s.oninput=()=>{S.er.s=+s.value;s.nextElementSibling.textContent=s.value;saveS()};
+  el.querySelector('#pClr').onclick=async()=>{closePop();if(!pg.strokes.length&&!pg.images.length)return;if(await modal({title:'清除這一頁？',text:'會清除這一頁所有筆跡和圖片（PDF 底圖會保留）。可以用復原找回。',ok:'清除',danger:true})){pushUndo(snapshot());pg.strokes=[];pg.images=[];sel=null;render();markDirty()}}});return}
+ const cfg=t==='pen'?S.pen:S.hl,cols=t==='pen'?PEN_C:HL_C;
+ openPop(anchor,`<div class="ph">${t==='pen'?'鋼筆':'螢光筆'}</div><div class="cols">${cols.map(c=>`<button class="cdot ${c===cfg.c?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" id="pC" value="${cfg.c}"></label></div><label class="sl">粗細<input type="range" id="pS" min="${t==='pen'?0.5:6}" max="${t==='pen'?16:48}" step="${t==='pen'?0.5:1}" value="${cfg.s}"><output>${cfg.s}</output></label><canvas id="pPrev"></canvas>`,el=>{
+  el.querySelector('.cols').onclick=ev=>{const d=ev.target.closest('[data-c]');if(!d)return;cfg.c=d.dataset.c;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.toggle('on',x===d));syncUI();drawPrev()};
+  el.querySelector('#pC').oninput=ev=>{cfg.c=ev.target.value;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.remove('on'));syncUI();drawPrev()};
+  const s=el.querySelector('#pS');s.oninput=()=>{cfg.s=+s.value;s.nextElementSibling.textContent=s.value;saveS();drawPrev()};drawPrev()})}
+$$('.tool').forEach(b=>b.onclick=()=>{if(S.tool===b.dataset.t)toolPop(b);else{closePop();setTool(b.dataset.t)}});
+$('#bSw').onclick=e=>toolPop(e.currentTarget);
+$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
+$('#bImg').onclick=()=>$('#fImg').click();
+$('#bPrev').onclick=()=>goPage(cur-1);$('#bNext').onclick=()=>goPage(cur+1);
+$('#bAdd').onclick=()=>addPage(cur);
+$('#bBack').onclick=()=>showHome();
+$('#bTitle').onclick=async()=>{const n=await modal({title:'重新命名筆記本',input:nb.name,ok:'儲存'});if(n){nb.name=n;$('#bTitle').textContent=n;flush()}};
+function applyNight(){document.documentElement.toggleAttribute('data-night',!!S.night);syncUI();if(pg){if(!S.night)for(const e of imgCache.values())if(e.inv){e.inv.width=0;e.inv=null}render()}}
+$('#bMore').onclick=e=>{const a=e.currentTarget;openPop(a,`<div class="ph">翻頁方式</div><div class="seg" id="mScroll"><button data-s="h" class="${S.scroll!=='v'?'on':''}">左右翻頁</button><button data-s="v" class="${S.scroll==='v'?'on':''}">上下捲動</button></div><div class="ph">紙張（這一頁）</div><div class="seg" id="mPaper">${PAPERS.map(([k,n])=>`<button data-p="${k}" class="${pg.paper===k?'on':''}">${n}</button>`).join('')}</div><button class="mi" id="mAll"><span>把這種紙張套用到所有頁面</span></button><div class="hr"></div>
+ <label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="mNight" ${S.night?'checked':''}></label>
+ <label class="mi"><span>只用 Apple Pencil 書寫<small>開啟後手指只會捲動和縮放，手掌碰到螢幕不會留下筆跡</small></span><input type="checkbox" class="tg" id="mPen" ${S.pencilOnly?'checked':''}></label>
+ <label class="mi"><span>手指點一下叫出快捷選單<small>需開啟「只用 Apple Pencil 書寫」</small></span><input type="checkbox" class="tg" id="mQuick" ${S.quick?'checked':''}></label>
+ <label class="mi"><span>夜間模式下反轉 PDF 顏色</span><input type="checkbox" class="tg" id="mInv" ${S.invertPdf?'checked':''}></label><div class="hr"></div>
+ <button class="mi" id="mIns"><span>插入 PDF 頁面</span></button><button class="mi d" id="mDel"><span>刪除這一頁</span></button><button class="mi" id="mPng"><span>匯出這一頁（PNG 圖片）</span></button><button class="mi" id="mPdf1"><span>匯出這一頁（PDF）</span></button><button class="mi" id="mPdf"><span>匯出整本筆記本（PDF）</span></button>
+ <p class="hint">手勢：單指點一下＝快捷選單，雙指點一下＝復原，三指點一下＝重做，雙指捏合＝縮放。</p>`,el=>{
+ el.querySelector('#mScroll').onclick=ev=>{const b=ev.target.closest('[data-s]');if(!b||S.scroll===b.dataset.s)return;S.scroll=b.dataset.s;saveS();el.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));goPage(cur,true)};
+ el.querySelector('#mPaper').onclick=ev=>{const b=ev.target.closest('[data-p]');if(!b)return;pg.paper=b.dataset.p;S.paper=pg.paper;saveS();el.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));render();markDirty()};
+ el.querySelector('#mAll').onclick=()=>{for(const p of pages){if(p.paper!==pg.paper){p.paper=pg.paper;markDirty(p)}}toast('已套用到所有頁面');closePop()};
+ el.querySelector('#mNight').onchange=ev=>{S.night=ev.target.checked;saveS();applyNight()};
+ el.querySelector('#mPen').onchange=ev=>{S.pencilOnly=ev.target.checked;S.pencilAuto=false;saveS()};
+ el.querySelector('#mQuick').onchange=ev=>{S.quick=ev.target.checked;saveS()};
+ el.querySelector('#mInv').onchange=ev=>{S.invertPdf=ev.target.checked;saveS();render()};
+ el.querySelector('#mDel').onclick=()=>{closePop();delPage(cur)};
+ el.querySelector('#mIns').onclick=()=>{closePop();pdfInto=true;$('#fPdf').click()};
+ el.querySelector('#mPng').onclick=()=>{closePop();exportPng()};
+ el.querySelector('#mPdf1').onclick=()=>{closePop();exportPdf(nb.name+` 第${cur+1}頁`,[pg])};
+ el.querySelector('#mPdf').onclick=()=>{closePop();exportPdf(nb.name,pages)}})};
+
+/* ---------- quick menu (pen long-press) ---------- */
+const quick=$('#quick');
+function hideQuick(outside){quick.hidden=true;quick.innerHTML='';if(outside)quickClosedAt=now()}
+let quickAt={x:0,y:0};
+const qPen=()=>(S.qpen&&S.qpen.length?S.qpen:PEN_C.filter(c=>c!=='#ffffff').slice(0,7)),qHl=()=>(S.qhl&&S.qhl.length?S.qhl:HL_C.slice());
+function editQuick(){let pen=qPen().slice(),hl=qHl().slice(),selR='pen',selI=0;
+ modal({title:'自訂快捷選單顏色',text:'點一個顏色選取它，再調整位置或換成其他顏色。',ok:'完成',cancel:'取消',html:'<div class="qed"></div>'}).then(v=>{if(v){S.qpen=pen;S.qhl=hl;saveS();toast('已更新快捷選單顏色')}});
+ const box=$('#modal .qed');
+ const draw=()=>{const row=(arr,r)=>arr.map((c,i)=>`<button class="cdot ${selR===r&&selI===i?'on':''}" data-r="${r}" data-i="${i}" style="--c:${r==='pen'?nc(c,S.night):c}" aria-label="${c}"></button>`).join('');const cur=(selR==='pen'?pen:hl)[selI];
+  box.innerHTML=`<small>鋼筆</small><div class="qrow">${row(pen,'pen')}</div><small>螢光筆</small><div class="qrow">${row(hl,'hl')}</div><div class="qmv"><button class="btn ghost" data-m="-1">往前移</button><button class="btn ghost" data-m="1">往後移</button></div><small>把選取的顏色換成</small><div class="cols">${[...PEN_C,...HL_C].map(c=>`<button class="cdot ${c===cur?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" value="${cur}" data-k="1"></label></div><button class="mi" data-reset="1"><span>恢復預設顏色</span></button>`};
+ box.onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset,arr=selR==='pen'?pen:hl;
+  if(d.r){selR=d.r;selI=+d.i}else if(d.m){const j=selI+Number(d.m);if(j>=0&&j<arr.length){[arr[selI],arr[j]]=[arr[j],arr[selI]];selI=j}}else if(d.c){arr[selI]=d.c}else if(d.reset){pen=PEN_C.filter(c=>c!=='#ffffff').slice(0,7);hl=HL_C.slice();selR='pen';selI=0}else return;e.stopPropagation();draw()};
+ box.oninput=e=>{if(!e.target.dataset.k)return;const arr=selR==='pen'?pen:hl;arr[selI]=e.target.value;const dot=box.querySelector(`.qrow [data-r="${selR}"][data-i="${selI}"]`);if(dot)dot.style.setProperty('--c',selR==='pen'?nc(e.target.value,S.night):e.target.value)};
+ draw()}
+function showQuick(x,y){closePop();quickAt={x,y};const tb=t=>`<button class="ib ${S.tool===t?'on':''}" data-t="${t}" aria-label="${t}"><svg class="i"><use href="#i-${t==='eraser'?'er':t}"/></svg></button>`;
+ quick.innerHTML=`<div class="qr">${tb('pen')}${tb('hl')}${tb('eraser')}${tb('lasso')}<button class="ib" data-u="u" aria-label="復原"><svg class="i"><use href="#i-undo"/></svg></button></div>${CLIP?'<button class="qp" data-v="1">貼上</button>':''}${navigator.clipboard&&navigator.clipboard.read?'<button class="qp" data-v="2">貼上剪貼簿的圖片</button>':''}<small>鋼筆<button class="qe" data-e="1">編輯顏色</button></small><div class="qc">${qPen().map(c=>`<button class="cdot ${S.tool==='pen'&&S.pen.c===c?'on':''}" data-pc="${c}" style="--c:${nc(c,S.night)}" aria-label="${c}"></button>`).join('')}</div><small>螢光筆</small><div class="qc">${qHl().map(c=>`<button class="cdot ${S.tool==='hl'&&S.hl.c===c?'on':''}" data-hc="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}</div>`;
+ quick.hidden=false;const w=quick.offsetWidth,h=quick.offsetHeight;let top=y-h-24;if(top<8)top=y+24;quick.style.left=clamp(x-w/2,8,innerWidth-w-8)+'px';quick.style.top=clamp(top,8,innerHeight-h-8)+'px'}
+quick.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+ if(d.e){hideQuick();editQuick();return}if(d.v){focusAt(quickAt.y);const q=toPage({clientX:quickAt.x,clientY:quickAt.y});if(d.v==='2')pasteSystem(q.x,q.y);else pasteAt(q.x,q.y)}else if(d.t)setTool(d.t);else if(d.u)undo();else if(d.pc){S.pen.c=d.pc;saveS();setTool('pen')}else if(d.hc){S.hl.c=d.hc;saveS();setTool('hl')}hideQuick()});
+document.addEventListener('pointerdown',e=>{if(!quick.hidden&&!quick.contains(e.target))hideQuick(true)},true);
+
+/* ---------- fullscreen ---------- */
+const de=document.documentElement,fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+const fsOK=!!(de.requestFullscreen||de.webkitRequestFullscreen)&&(document.fullscreenEnabled!==false||document.webkitFullscreenEnabled);
+if(!fsOK)$('#bFs').hidden=true;
+$('#bFs').onclick=async()=>{try{if(fsEl()){await (document.exitFullscreen||document.webkitExitFullscreen).call(document)}else{const r=(de.requestFullscreen||de.webkitRequestFullscreen).call(de);if(r&&r.then)await r}}catch(e){toast('這個環境不允許全螢幕，請把 App 加入主畫面使用')}};
+const fsSync=()=>{$('#bFs use').setAttribute('href',fsEl()?'#i-fsx':'#i-fs');setTimeout(resize,120)};
+document.addEventListener('fullscreenchange',fsSync);document.addEventListener('webkitfullscreenchange',fsSync);
+
+/* ---------- pages ---------- */
+function goPage(i,refit){if(!pages.length)return;i=clamp(i,0,pages.length-1);stopInertia();if(act)cancelAct();sel=null;T.clear();gest=null;cursor=null;if(pg&&dirty.has(pg))flush();pg=pages[i];cur=i;nb.last=i;layout();if(vMode()&&!refit&&SW){cam.ty=14-pg._oy*cam.s;clampCam()}else fit();render();syncUI();if(!$('#drawer').hidden)renderDrawer()}
+async function addPage(after){const ref=pages[after];const p=newPage(ref&&!ref.bg?ref.paper:S.paper);pages.splice(after+1,0,p);markDirty(p);await flush();goPage(after+1);toast(`已新增第 ${after+2} 頁`)}
+async function delPage(i){
+ if(pages.length===1){if(await modal({title:'清空這一頁？',text:'這是最後一頁，會清除所有筆跡和圖片。',ok:'清空',danger:true})){pushUndo(snapshot());pg.strokes=[];pg.images=[];render();markDirty()}return}
+ if(!await modal({title:`刪除第 ${i+1} 頁？`,text:'刪除後無法復原。',ok:'刪除',danger:true}))return;
+ const p=pages.splice(i,1)[0];dirty.delete(p);await DB.del('pages',p.id);const used=new Set(pages.flatMap(keysOf));for(const k of keysOf(p))if(!used.has(k))DB.del('blobs',k);pg=null;await flush();goPage(Math.min(i,pages.length-1))}
+function renderDrawer(){if(pg&&pg._td){pg.thumb=makeThumb(pg)}const d=$('#dlist');d.innerHTML=pages.map((p,i)=>`<div class="pg ${i===cur?'cur':''}" data-i="${i}"><div class="th" style="aspect-ratio:${p.w}/${p.h}">${p.thumb?`<img src="${p.thumb}" alt="">`:''}</div><span>${i+1}</span></div>`).join('');const c=d.querySelector('.cur');if(c)c.scrollIntoView({block:'nearest'});$('#dUp').disabled=cur===0;$('#dDown').disabled=cur===pages.length-1}
+$('#dlist').onclick=e=>{const p=e.target.closest('.pg');if(p)goPage(+p.dataset.i)};
+$('#bPages').onclick=()=>{const d=$('#drawer');d.hidden=!d.hidden;if(!d.hidden)renderDrawer()};
+$('#dClose').onclick=()=>{$('#drawer').hidden=true};
+function movePage(dir){const j=cur+dir;if(j<0||j>=pages.length)return;[pages[cur],pages[j]]=[pages[j],pages[cur]];flush();goPage(j)}
+$('#dUp').onclick=()=>movePage(-1);$('#dDown').onclick=()=>movePage(1);
+$('#dDup').onclick=async()=>{const r=JSON.parse(JSON.stringify(ser(pg)));r.id=uid();r.images.forEach(i=>i.id=uid());const p=deser(r);pages.splice(cur+1,0,p);markDirty(p);await flush();goPage(cur+1);toast('已複製這一頁')};
+$('#dDel').onclick=()=>delPage(cur);
+$('#dAdd').onclick=()=>addPage(cur);
+
+/* ---------- images ---------- */
+function fileToImg(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{res(i);setTimeout(()=>URL.revokeObjectURL(u),1000)};i.onerror=()=>rej(new Error('img'));i.src=u})}
+$('#fImg').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f&&pg)insertImageFile(f)};
+async function insertImageFile(f,at){try{const im=await fileToImg(f),w=im.naturalWidth,h=im.naturalHeight,k=Math.min(1,2048/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);const png=/png|gif|webp/.test(f.type);const blob=await toBlob(c,png?'image/png':'image/jpeg',0.9);c.width=0;const key=uid();await DB.put('blobs',{type:blob.type,buf:await blob.arrayBuffer()},key);
+ const cx=at?at.x:(SW/2-cam.tx)/cam.s,cy=at?at.y:(SH/2-cam.ty)/cam.s-pg._oy,dw=Math.min(pg.w*0.6,SW/cam.s*0.6),dh=dw*h/w,o={id:uid(),key,x:clamp(cx-dw/2,0,Math.max(0,pg.w-dw)),y:clamp(cy-dh/2,0,Math.max(0,pg.h-dh)),w:dw,h:dh};
+ await loadImgP(key);pushUndo(snapshot());pg.images.push(o);setTool('lasso');makeSel(new Set(),new Set([o]));placeSelBar();markDirty();toast('可以拖曳移動圖片，拉右下角圓點縮放')}catch(err){toast('無法讀取這張圖片')}}
+
+/* ---------- pdf import ---------- */
+let pdfInto=false;
+const absU=u=>new URL(u,location.href).href;
+async function loadPdfJs(){if(window.pdfjsLib)return window.pdfjsLib;let local=true;try{await loadScript('pdf.min.js')}catch(e){local=false;await loadScript(PDFCDN+'pdf.min.js')}const L=window.pdfjsLib;L.GlobalWorkerOptions.workerSrc=local?absU('pdf.worker.min.js'):PDFCDN+'pdf.worker.min.js';L._local=local;return L}
+const pdfData={};
+function pdfBundle(n){return pdfData[n]||(pdfData[n]=(async()=>{const u=[absU(n+'.json'),'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/'+(n==='cmaps'?'cmaps/':'standard_fonts/')];try{const r=await fetch(u[0]);if(!r.ok)throw 0;return {map:await r.json()}}catch(e){pdfData[n]=null;return {cdn:u[1]}}})())}
+class PdfCMap{async fetch({name}){const b=await pdfBundle('cmaps');let d;if(b.map){if(!b.map[name])throw new Error('CMap '+name);d=new Uint8Array(unb64(b.map[name]))}else{const r=await fetch(b.cdn+name+'.bcmap');d=new Uint8Array(await r.arrayBuffer())}return {cMapData:d,compressionType:1}}}
+class PdfFont{async fetch({filename}){const b=await pdfBundle('fonts');if(b.map){if(!b.map[filename])throw new Error('font '+filename);return new Uint8Array(unb64(b.map[filename]))}const r=await fetch(b.cdn+filename);return new Uint8Array(await r.arrayBuffer())}}
+$('#fPdf').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importPdf(f,pdfInto);pdfInto=false};
+async function importPdf(file,into){let L;busy('正在準備 PDF 工具…',0);try{L=await loadPdfJs()}catch(e){busy(null);toast('無法載入 PDF 工具，請確認網路連線');return}
+ try{const data=new Uint8Array(await file.arrayBuffer());const opt={data,isEvalSupported:false,useWorkerFetch:false,CMapReaderFactory:PdfCMap,StandardFontDataFactory:PdfFont,useSystemFonts:true};
+  const doc=await L.getDocument(opt).promise,N=doc.numPages;
+  const target=into?nb:{id:uid(),name:file.name.replace(/\.pdf$/i,'')||'PDF',pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0};
+  const c=document.createElement('canvas'),g=c.getContext('2d'),made=[];
+  for(let i=1;i<=N;i++){busy(`正在匯入第 ${i} / ${N} 頁…`,(i-1)/N);const page=await doc.getPage(i),v1=page.getViewport({scale:1});const sc=Math.min(2000/v1.width,Math.sqrt(6e6/(v1.width*v1.height)));const vp=page.getViewport({scale:sc});c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);g.setTransform(1,0,0,1,0,0);g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await page.render({canvasContext:g,viewport:vp}).promise;
+   const blob=await toBlob(c,'image/jpeg',0.88),key=uid();await DB.put('blobs',{type:'image/jpeg',buf:await blob.arrayBuffer()},key);
+   const t=document.createElement('canvas');t.width=180;t.height=Math.round(180*c.height/c.width);t.getContext('2d').drawImage(c,0,0,t.width,t.height);const thumb=t.toDataURL('image/jpeg',0.72);t.width=0;
+   const p={id:uid(),nb:target.id,w:1000,h:Math.round(1000*c.height/c.width),paper:'blank',bg:key,strokes:[],images:[],thumb};await DB.put('pages',p);made.push(p);if(page.cleanup)page.cleanup()}
+  c.width=0;try{doc.destroy()}catch(_){}
+  if(into){const at=cur+1;pages.splice(at,0,...made.map(deser));await flush();busy(null);goPage(at);toast(`已插入 ${made.length} 頁`)}
+  else{target.pageIds=made.map(p=>p.id);target.cover=made[0]&&made[0].thumb;await DB.put('nbs',target);busy(null);openNb(target.id)}
+ }catch(e){busy(null);toast(e&&e.name==='PasswordException'?'這個 PDF 有密碼保護，無法匯入':'匯入失敗：'+(e&&e.message||e))}}
+
+/* ---------- export ---------- */
+async function renderExport(c,p){const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);for(const k of keysOf(p))await loadImgP(k);const k=c.width/p.w;g.setTransform(k,0,0,k,0,0);drawContent(g,p,false,null,null)}
+async function exportPng(){busy('正在匯出圖片…',0.3);try{const c=document.createElement('canvas');c.width=2000;c.height=Math.round(2000*pg.h/pg.w);await renderExport(c,pg);const b=await toBlob(c,'image/png');c.width=0;busy(null);await saveFile(safeName(nb.name)+`-第${cur+1}頁.png`,b)}catch(e){busy(null);toast('匯出失敗：'+(e&&e.message||e))}}
+function buildPdf(list){const enc=new TextEncoder(),parts=[],offs=[];let len=0;const add=x=>{const u=typeof x==='string'?enc.encode(x):x;parts.push(u);len+=u.length};
+ add('%PDF-1.4\n');add(new Uint8Array([37,226,227,207,211,10]));const n=list.length;
+ offs[1]=len;add('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+ offs[2]=len;add(`2 0 obj\n<< /Type /Pages /Kids [${list.map((_,i)=>`${3+3*i} 0 R`).join(' ')}] /Count ${n} >>\nendobj\n`);
+ list.forEach((p,i)=>{const po=3+3*i,co=po+1,io=po+2,pw=p.pw.toFixed(2),ph=p.ph.toFixed(2),cs=`q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`;
+  offs[po]=len;add(`${po} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 ${io} 0 R >> >> /Contents ${co} 0 R >>\nendobj\n`);
+  offs[co]=len;add(`${co} 0 obj\n<< /Length ${cs.length} >>\nstream\n${cs}\nendstream\nendobj\n`);
+  offs[io]=len;add(`${io} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${p.W} /Height ${p.H} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpg.length} >>\nstream\n`);add(p.jpg);add('\nendstream\nendobj\n')});
+ const total=3+3*n,xo=len;let x=`xref\n0 ${total}\n0000000000 65535 f \n`;for(let i=1;i<total;i++)x+=String(offs[i]).padStart(10,'0')+' 00000 n \n';add(x);add(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xo}\n%%EOF\n`);return new Blob(parts,{type:'application/pdf'})}
+async function exportPdf(name,list){busy('正在匯出 PDF…',0);try{const out=[],c=document.createElement('canvas'),keep=new Set(pg?keysOf(pg):[]);for(let i=0;i<list.length;i++){const p=list[i],W=1654,H=Math.round(W*p.h/p.w);c.width=W;c.height=H;await renderExport(c,p);const b=await toBlob(c,'image/jpeg',0.9);out.push({jpg:new Uint8Array(await b.arrayBuffer()),W,H,pw:595.28,ph:595.28*p.h/p.w});busy(`正在匯出 PDF…（${i+1} / ${list.length}）`,(i+1)/list.length);if(i%4===3)evictExcept(keep)}c.width=0;evictExcept(keep);const pdf=buildPdf(out);busy(null);await saveFile(safeName(name)+'.pdf',pdf)}catch(e){busy(null);toast('匯出失敗：'+(e&&e.message||e))}}
+
+/* ---------- notebooks / home ---------- */
+const spine=id=>{let h=0;for(const ch of id)h=(h*31+ch.charCodeAt(0))%360;return `hsl(${h} 45% 45%)`};
+async function renderHome(){const list=(await DB.all('nbs')).sort((a,b)=>(b.updated||0)-(a.updated||0));const g=$('#grid');{const w=$('#bakWarn'),lb=S.lastBackup||0,days=Math.floor((Date.now()-lb)/864e5),changed=list.some(n=>(n.updated||0)>lb);if(list.length&&changed&&days>=3){w.hidden=false;w.innerHTML=(lb?`已經 ${days} 天沒有備份了。`:'還沒有備份過。')+' <button class="btn ghost" id="bakNow" style="height:34px;margin-left:6px">立即備份</button>';w.querySelector('#bakNow').onclick=()=>backup()}else w.hidden=true}
+ g.innerHTML=list.length?list.map(n=>`<div class="nb" data-id="${esc(n.id)}"><button class="cover" data-open style="--spine:${spine(n.id)}" aria-label="開啟 ${esc(n.name)}">${n.cover?`<img src="${n.cover}" alt="">`:''}</button><div class="meta"><div><b>${esc(n.name)}</b><small>${(n.pageIds||[]).length} 頁 · ${fmtDate(n.updated||n.created)}</small></div><button class="ib" data-more aria-label="筆記本選項"><svg class="i"><use href="#i-more"/></svg></button></div></div>`).join(''):`<div class="empty"><h2>還沒有筆記本</h2><p>點「新筆記本」開始手寫，或「匯入 PDF」直接在講義上寫。</p></div>`}
+$('#grid').onclick=e=>{const card=e.target.closest('.nb');if(!card)return;const id=card.dataset.id;if(e.target.closest('[data-open]'))openNb(id);else if(e.target.closest('[data-more]')){const a=e.target.closest('[data-more]');openPop(a,`<button class="mi" data-x="ren"><span>重新命名</span></button><button class="mi" data-x="pdf"><span>匯出 PDF</span></button><button class="mi d" data-x="del"><span>刪除筆記本</span></button>`,el=>{el.onclick=async ev=>{const b=ev.target.closest('[data-x]');if(!b)return;closePop();const n=await DB.get('nbs',id);if(!n)return;
+ if(b.dataset.x==='ren'){const v=await modal({title:'重新命名筆記本',input:n.name,ok:'儲存'});if(v){n.name=v;await DB.put('nbs',n);renderHome()}}
+ else if(b.dataset.x==='pdf'){const recs=await DB.pagesOf(id),m=new Map(recs.map(r=>[r.id,r]));await exportPdf(n.name,n.pageIds.map(i=>m.get(i)).filter(Boolean).map(deser));evictExcept(new Set())}
+ else{if(!await modal({title:`刪除「${n.name}」？`,text:'筆記本裡的所有頁面都會被刪除，無法復原。',ok:'刪除',danger:true}))return;const recs=await DB.pagesOf(id);for(const r of recs){for(const k of keysOf(r))await DB.del('blobs',k);await DB.del('pages',r.id)}await DB.del('nbs',id);renderHome()}}})}};
+async function openNb(id){const n=await DB.get('nbs',id);if(!n){toast('找不到這本筆記本');return}nb=n;nb.pageIds=nb.pageIds||[];const recs=await DB.pagesOf(id),m=new Map(recs.map(r=>[r.id,r]));pages=nb.pageIds.map(i=>m.get(i)).filter(Boolean).map(deser);if(!pages.length){const p=newPage();pages=[p];markDirty(p)}
+ $('#home').hidden=true;$('#editor').hidden=false;$('#drawer').hidden=true;$('#bTitle').textContent=nb.name;pg=null;cur=0;syncUI();await new Promise(r=>requestAnimationFrame(r));resize();goPage(nb.last||0,true)}
+async function showHome(){closePop();stopInertia();if(act)cancelAct();sel=null;HU=[];HR=[];for(const p of pages)dropCache(p);await flush();pg=null;nb=null;pages=[];evictExcept(new Set());selbar.hidden=true;$('#drawer').hidden=true;$('#editor').hidden=true;$('#home').hidden=false;renderHome()}
+$('#hNew').onclick=async()=>{const list=await DB.all('nbs');const name=await modal({title:'新筆記本',input:`筆記本 ${list.length+1}`,ok:'建立',html:`<p style="margin:0">紙張：可在筆記本內的「⋯」更換</p>`});if(!name)return;nb={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0};const p=newPage();pages=[p];markDirty(p);await flush();openNb(nb.id)};
+$('#hPdf').onclick=()=>{pdfInto=false;$('#fPdf').click()};
+$('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{
+ el.querySelector('#xBak').onclick=()=>{closePop();backup()};el.querySelector('#xRes').onclick=()=>{closePop();$('#fBak').click()};
+ el.querySelector('#xNight').onchange=ev=>{S.night=ev.target.checked;saveS();applyNight()};
+ try{navigator.storage.estimate().then(u=>{const x=el.querySelector('#xUse');if(x)x.textContent=`目前使用 ${(u.usage/1048576).toFixed(1)} MB`})}catch(_){}});
+async function backup(){busy('正在備份…',0);try{const nbs=await DB.all('nbs'),pgs=await DB.all('pages'),keys=await DB.keys('blobs'),parts=['{"app":"inkbook","v":1,"nbs":',JSON.stringify(nbs),',"pages":',JSON.stringify(pgs),',"blobs":{'];let cnt=0;
+ for(let i=0;i<keys.length;i++){const r=await DB.get('blobs',keys[i]);if(r)parts.push((cnt++?',':'')+JSON.stringify(String(keys[i]))+':'+JSON.stringify({type:r.type,b64:b64(r.buf)}));busy('正在備份…',(i+1)/keys.length)}
+ parts.push('}}');busy(null);const d=new Date();if(await saveFile(`手寫筆記備份-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`,new Blob(parts,{type:'application/json'}))){S.lastBackup=Date.now();saveS();renderHome()}}catch(e){busy(null);toast('備份失敗：'+(e&&e.message||e))}}
+$('#fBak').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;busy('正在還原…',0);try{const j=JSON.parse(await f.text());if(j.app!=='inkbook')throw new Error('這不是手寫筆記的備份檔');const ks=Object.keys(j.blobs||{});for(let i=0;i<ks.length;i++){const v=j.blobs[ks[i]];await DB.put('blobs',{type:v.type,buf:unb64(v.b64)},ks[i]);busy('正在還原…',(i+1)/(ks.length+1))}for(const p of j.pages||[])await DB.put('pages',p);for(const n of j.nbs||[])await DB.put('nbs',n);busy(null);toast(`已還原 ${(j.nbs||[]).length} 本筆記本`);renderHome()}catch(err){busy(null);toast('還原失敗：'+(err&&err.message||err))}};
+
+/* ---------- lifecycle ---------- */
+function rescueDirty(){for(const p of dirty)rescue('p.'+p.id,{...ser(p),thumb:null});if(nb&&pages.length&&dirty.size)rescue('n.'+nb.id,{...nb,pageIds:pages.map(x=>x.id),updated:Date.now(),cover:null})}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){rescueDirty();flush()}else if(!DB.mem){DB.get('nbs','__ping').catch(()=>{});if(dirty.size)flush()}});
+addEventListener('pagehide',()=>{rescueDirty();flush()});
+(async()=>{applyNight();syncUI();const ok=await DB.open();if(!ok){$('#storeWarn').hidden=false;modal({title:'無法存取儲存空間',text:'iPad 的儲存空間沒有回應，現在寫的筆記可能無法保存。建議先完全關閉 App（從多工畫面往上滑掉），再重新打開。',ok:'知道了',cancel:''})}else{const n=await recoverRescue();if(n)toast(`已救回 ${n} 頁上次沒存好的筆記`)}try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(_){}renderHome()})();
+window.__ink={DB,get dirty(){return dirty},get cam(){return cam},get cur(){return cur},get pg(){return pg},get pages(){return pages},S,undo,redo};
+}
+</script>
+</body>
+</html>

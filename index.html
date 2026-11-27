@@ -793,6 +793,7 @@ function rescueDirty(){for(const p of dirty)rescue('p.'+p.id,{...ser(p),thumb:nu
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){rescueDirty();flush()}else if(!DB.mem){DB.get('nbs','__ping').catch(()=>{});if(dirty.size)flush()}});
 addEventListener('pagehide',()=>{rescueDirty();flush()});
 (async()=>{applyNight();syncUI();const ok=await DB.open();if(!ok){$('#storeWarn').hidden=false;modal({title:'無法存取儲存空間',text:'iPad 的儲存空間沒有回應，現在寫的筆記可能無法保存。建議先完全關閉 App（從多工畫面往上滑掉），再重新打開。',ok:'知道了',cancel:''})}else{const n=await recoverRescue();if(n)toast(`已救回 ${n} 頁上次沒存好的筆記`)}try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(_){}renderHome()})();
+if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
 window.__ink={DB,get dirty(){return dirty},get cam(){return cam},get cur(){return cur},get pg(){return pg},get pages(){return pages},S,undo,redo};
 }
 </script>

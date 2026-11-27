@@ -249,6 +249,7 @@ input.tg:checked::after{transform:translateX(20px)}
 <input type="file" id="fImg" accept="image/*" hidden>
 <input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
 <input type="file" id="fBak" accept=".json,application/json" hidden>
+<input type="file" id="fSaber" accept=".sba,.sbn2,.sbn" hidden>
 
 <script>
 {
@@ -265,7 +266,7 @@ const PAPERS=[['blank','空白'],['lined','橫線'],['grid','方格'],['dot','�
 
 /* ---------- settings ---------- */
 const LS='inkbook.settings';
-const S={scroll:'h',qpen:null,qhl:null,quick:true,night:null,pencilOnly:false,pencilAuto:true,invertPdf:true,paper:'lined',tool:'pen',pen:{c:'#1d1d1f',s:3},hl:{c:'#ffe14d',s:20},er:{s:20,mode:'stroke'}};
+const S={scroll:'h',qpen:null,qhl:null,quick:true,night:null,pencilOnly:false,pencilAuto:true,invertPdf:true,paper:'lined',tool:'pen',pen:{c:'#1d1d1f',s:3,k:'fp',th:0.55,sl:0.45,tp:0},hl:{c:'#ffe14d',s:20},er:{s:20,mode:'stroke'}};
 try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k in o){if(S[k]&&typeof S[k]==='object')Object.assign(S[k],o[k]);else S[k]=o[k]}}catch(e){}
 if(!S.v2){S.v2=true;try{if(navigator.maxTouchPoints>0){S.pencilOnly=true}}catch(e){}}
 if(S.night==null){try{S.night=matchMedia('(prefers-color-scheme: dark)').matches}catch(e){S.night=false}}
@@ -323,10 +324,16 @@ const keysOf=p=>[p.bg,...(p.images||[]).map(i=>i.key)].filter(Boolean);
 
 /* ---------- strokes ---------- */
 const penR=(s,p)=>Math.max(0.3,s*(0.2+1.1*p))/2;
-function bboxOf(st){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const p=st.p;for(let i=0;i<p.length;i+=3){const x=p[i],y=p[i+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}const pad=(st.t==='hl'?st.s/2:penR(st.s,1))+1;return [x0-pad,y0-pad,x1+pad,y1+pad]}
+function bboxOf(st){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const p=st.p;for(let i=0;i<p.length;i+=3){const x=p[i],y=p[i+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}const pad=(st.t==='hl'?st.s/2:st.k?st.s*0.8:penR(st.s,1))+1;return [x0-pad,y0-pad,x1+pad,y1+pad]}
 function nc(c,night){if(!night)return c;const n=parseInt(c.slice(1),16),L=(0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255;return L<0.22?'#ececee':c}
 function penPath(ctx,p,s,from){const n=p.length/3;for(let i=Math.max(0,from);i<n;i++){const x=p[i*3],y=p[i*3+1],r=penR(s,p[i*3+2]);ctx.moveTo(x+r,y);ctx.arc(x,y,r,0,Math.PI*2);if(i>0){const px=p[i*3-3],py=p[i*3-2],pr=penR(s,p[i*3-1]),dx=x-px,dy=y-py,L=Math.hypot(dx,dy);if(L>0.01){const nx=-dy/L,ny=dx/L;ctx.moveTo(px+nx*pr,py+ny*pr);ctx.lineTo(px-nx*pr,py-ny*pr);ctx.lineTo(x-nx*r,y-ny*r);ctx.lineTo(x+nx*r,y+ny*r);ctx.closePath()}}}}
-function drawStroke(ctx,st,night){const p=st.p;if(!p.length)return;if(st.t==='hl'){ctx.save();ctx.globalCompositeOperation=night?'source-over':'multiply';ctx.globalAlpha=night?0.42:0.8;ctx.strokeStyle=st.c;ctx.lineWidth=st.s;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(p[0],p[1]);if(p.length===3)ctx.lineTo(p[0]+0.01,p[1]);for(let i=3;i<p.length;i+=3)ctx.lineTo(p[i],p[i+1]);ctx.stroke();ctx.restore();return}ctx.fillStyle=nc(st.c,night);ctx.beginPath();penPath(ctx,p,st.s,0);ctx.fill('nonzero')}
+/* perfect-freehand 1.2.2 (MIT License, Copyright (c) 2021 Stephen Ruiz Ltd) */
+const pfGetStroke=(()=>{function $(e,t,u,x=h=>h){return e*x(.5-t*(.5-u))}function se(e){return[-e[0],-e[1]]}function l(e,t){return[e[0]+t[0],e[1]+t[1]]}function a(e,t){return[e[0]-t[0],e[1]-t[1]]}function b(e,t){return[e[0]*t,e[1]*t]}function he(e,t){return[e[0]/t,e[1]/t]}function R(e){return[e[1],-e[0]]}function B(e,t){return e[0]*t[0]+e[1]*t[1]}function ue(e,t){return e[0]===t[0]&&e[1]===t[1]}function ge(e){return Math.hypot(e[0],e[1])}function de(e){return e[0]*e[0]+e[1]*e[1]}function A(e,t){return de(a(e,t))}function G(e){return he(e,ge(e))}function ie(e,t){return Math.hypot(e[1]-t[1],e[0]-t[0])}function L(e,t,u){let x=Math.sin(u),h=Math.cos(u),y=e[0]-t[0],n=e[1]-t[1],f=y*h-n*x,d=y*x+n*h;return[f+t[0],d+t[1]]}function K(e,t,u){return l(e,b(a(t,e),u))}function ee(e,t,u){return l(e,b(t,u))}var{min:C,PI:xe}=Math,pe=.275,V=xe+1e-4;function ce(e,t={}){let{size:u=16,smoothing:x=.5,thinning:h=.5,simulatePressure:y=!0,easing:n=r=>r,start:f={},end:d={},last:D=!1}=t,{cap:S=!0,easing:j=r=>r*(2-r)}=f,{cap:q=!0,easing:c=r=>--r*r*r+1}=d;if(e.length===0||u<=0)return[];let p=e[e.length-1].runningLength,g=f.taper===!1?0:f.taper===!0?Math.max(u,p):f.taper,T=d.taper===!1?0:d.taper===!0?Math.max(u,p):d.taper,te=Math.pow(u*x,2),_=[],M=[],H=e.slice(0,10).reduce((r,i)=>{let o=i.pressure;if(y){let s=C(1,i.distance/u),W=C(1,1-s);o=C(1,r+(W-r)*(s*pe))}return(r+o)/2},e[0].pressure),m=$(u,h,e[e.length-1].pressure,n),U,X=e[0].vector,z=e[0].point,F=z,O=z,E=F,J=!1;for(let r=0;r<e.length;r++){let{pressure:i}=e[r],{point:o,vector:s,distance:W,runningLength:I}=e[r];if(r<e.length-1&&p-I<3)continue;if(h){if(y){let v=C(1,W/u),Z=C(1,1-v);i=C(1,H+(Z-H)*(v*pe))}m=$(u,h,i,n)}else m=u/2;U===void 0&&(U=m);let le=I<g?j(I/g):1,fe=p-I<T?c((p-I)/T):1;m=Math.max(.01,m*Math.min(le,fe));let re=(r<e.length-1?e[r+1]:e[r]).vector,Y=r<e.length-1?B(s,re):1,be=B(s,X)<0&&!J,ne=Y!==null&&Y<0;if(be||ne){let v=b(R(X),m);for(let Z=1/13,w=0;w<=1;w+=Z)O=L(a(o,v),o,V*w),_.push(O),E=L(l(o,v),o,V*-w),M.push(E);z=O,F=E,ne&&(J=!0);continue}if(J=!1,r===e.length-1){let v=b(R(s),m);_.push(a(o,v)),M.push(l(o,v));continue}let oe=b(R(K(re,s,Y)),m);O=a(o,oe),(r<=1||A(z,O)>te)&&(_.push(O),z=O),E=l(o,oe),(r<=1||A(F,E)>te)&&(M.push(E),F=E),H=i,X=s}let P=e[0].point.slice(0,2),k=e.length>1?e[e.length-1].point.slice(0,2):l(e[0].point,[1,1]),Q=[],N=[];if(e.length===1){if(!(g||T)||D){let r=ee(P,G(R(a(P,k))),-(U||m)),i=[];for(let o=1/13,s=o;s<=1;s+=o)i.push(L(r,P,V*2*s));return i}}else{if(!(g||T&&e.length===1))if(S)for(let i=1/13,o=i;o<=1;o+=i){let s=L(M[0],P,V*o);Q.push(s)}else{let i=a(_[0],M[0]),o=b(i,.5),s=b(i,.51);Q.push(a(P,o),a(P,s),l(P,s),l(P,o))}let r=R(se(e[e.length-1].vector));if(T||g&&e.length===1)N.push(k);else if(q){let i=ee(k,r,m);for(let o=1/29,s=o;s<1;s+=o)N.push(L(i,k,V*3*s))}else N.push(l(k,b(r,m)),l(k,b(r,m*.99)),a(k,b(r,m*.99)),a(k,b(r,m)))}return _.concat(N,M.reverse(),Q)}function me(e,t={}){var q;let{streamline:u=.5,size:x=16,last:h=!1}=t;if(e.length===0)return[];let y=.15+(1-u)*.85,n=Array.isArray(e[0])?e:e.map(({x:c,y:p,pressure:g=.5})=>[c,p,g]);if(n.length===2){let c=n[1];n=n.slice(0,-1);for(let p=1;p<5;p++)n.push(K(n[0],c,p/4))}n.length===1&&(n=[...n,[...l(n[0],[1,1]),...n[0].slice(2)]]);let f=[{point:[n[0][0],n[0][1]],pressure:n[0][2]>=0?n[0][2]:.25,vector:[1,1],distance:0,runningLength:0}],d=!1,D=0,S=f[0],j=n.length-1;for(let c=1;c<n.length;c++){let p=h&&c===j?n[c].slice(0,2):K(S.point,n[c],y);if(ue(S.point,p))continue;let g=ie(p,S.point);if(D+=g,c<j&&!d){if(D<x)continue;d=!0}S={point:p,pressure:n[c][2]>=0?n[c][2]:.5,vector:G(a(S.point,p)),distance:g,runningLength:D},f.push(S)}return f[0].vector=((q=f[1])==null?void 0:q.vector)||[0,0],f}function ae(e,t={}){return ce(me(e,t),t)}return ae;})();
+function outlinePath(ol){const P=new Path2D();const n=ol.length;if(!n)return P;P.moveTo(ol[0][0],ol[0][1]);for(let i=0;i<n;i++){const a=ol[i],b=ol[(i+1)%n];P.quadraticCurveTo(a[0],a[1],(a[0]+b[0])/2,(a[1]+b[1])/2)}P.closePath();return P}
+function pfOpts(st,last){const o=st.o||{},bp=st.k==='bp';return {size:st.s,thinning:bp?0:(o.th??0.5),smoothing:o.sm??0.5,streamline:o.sl??0.5,simulatePressure:!!o.sp,last,start:{taper:o.ts||0,cap:true},end:{taper:o.te||0,cap:true}}}
+function strokePath(st,last){if(st._path&&st._pn===st.p.length)return st._path;const p=st.p,pts=[];for(let i=0;i<p.length;i+=3)pts.push([p[i],p[i+1],p[i+2]]);const P=outlinePath(pfGetStroke(pts,pfOpts(st,last!==false)));if(last!==false){st._path=P;st._pn=p.length}return P}
+const cloneSt=(st,p,sz)=>{const n={t:st.t,c:st.c,s:sz==null?st.s:sz,p};if(st.k){n.k=st.k;n.o=st.o}return n};
+function drawStroke(ctx,st,night,live){const p=st.p;if(!p.length)return;if(st.t==='hl'){ctx.save();ctx.globalCompositeOperation=night?'source-over':'multiply';ctx.globalAlpha=night?0.42:0.8;ctx.strokeStyle=st.c;ctx.lineWidth=st.s;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(p[0],p[1]);if(p.length===3)ctx.lineTo(p[0]+0.01,p[1]);for(let i=3;i<p.length;i+=3)ctx.lineTo(p[i],p[i+1]);ctx.stroke();ctx.restore();return}ctx.fillStyle=nc(st.c,night);if(st.k){ctx.fill(strokePath(st,!live));return}ctx.beginPath();penPath(ctx,p,st.s,0);ctx.fill('nonzero')}
 function drawPaper(ctx,p,night){if(p.paper==='blank'||!p.paper)return;ctx.save();ctx.strokeStyle=night?'rgba(255,255,255,.13)':'rgba(60,100,160,.22)';ctx.fillStyle=night?'rgba(255,255,255,.3)':'rgba(60,80,120,.4)';ctx.lineWidth=1.1;ctx.beginPath();const g=40;
  if(p.paper==='lined'){for(let y=110;y<p.h-20;y+=44){ctx.moveTo(0,y);ctx.lineTo(p.w,y)}ctx.stroke()}
  else if(p.paper==='grid'){for(let x=g;x<p.w;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,p.h)}for(let y=g;y<p.h;y+=g){ctx.moveTo(0,y);ctx.lineTo(p.w,y)}ctx.stroke()}
@@ -341,8 +348,8 @@ function drawContent(ctx,p,night,vis,sx){
 /* ---------- state ---------- */
 let nb=null,pages=[],pg=null,cur=0,sel=null,act=null,cursor=null;
 const dirty=new Set();let saveT=null;
-function ser(p){return {id:p.id,nb:p.nb,w:p.w,h:p.h,paper:p.paper,bg:p.bg,strokes:p.strokes.map(s=>({t:s.t,c:s.c,s:s.s,p:s.p})),images:p.images.map(i=>({id:i.id,key:i.key,x:i.x,y:i.y,w:i.w,h:i.h})),thumb:p.thumb||null}}
-function deser(r){return {...r,strokes:(r.strokes||[]).map(s=>{const n={t:s.t,c:s.c,s:s.s,p:s.p};n.b=bboxOf(n);return n}),images:(r.images||[]).map(i=>({...i}))}}
+function ser(p){return {id:p.id,nb:p.nb,w:p.w,h:p.h,paper:p.paper,bg:p.bg,strokes:p.strokes.map(s=>cloneSt(s,s.p)),images:p.images.map(i=>({id:i.id,key:i.key,x:i.x,y:i.y,w:i.w,h:i.h})),thumb:p.thumb||null}}
+function deser(r){return {...r,strokes:(r.strokes||[]).map(s=>{const n=cloneSt(s,s.p);n.b=bboxOf(n);return n}),images:(r.images||[]).map(i=>({...i}))}}
 function newPage(paper){return {id:uid(),nb:nb.id,w:1000,h:1414,paper:paper||S.paper,bg:null,strokes:[],images:[],thumb:null}}
 function markDirty(p){p=p||pg;if(!p)return;p._ver=(p._ver||0)+1;dirty.add(p);if(saveState==='ok')setSave('saving');p._td=true;clearTimeout(saveT);saveT=setTimeout(flush,800)}
 let flushing=Promise.resolve();
@@ -400,7 +407,7 @@ function selXform(ctx){ctx.translate(sel.ax+sel.dx,sel.ay+sel.dy);ctx.scale(sel.
 function selRect(){const b=sel.box;return {x0:b[0]+sel.dx,y0:b[1]+sel.dy,x1:b[0]+sel.dx+(b[2]-b[0])*sel.sc,y1:b[1]+sel.dy+(b[3]-b[1])*sel.sc}}
 function drawLive(){if(lq){cancelAnimationFrame(lq);lq=0}lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,cv1.width,cv1.height);if(!pg||!SW)return;setCam(lx,pg);const k=1/cam.s;
  lx.save();lx.beginPath();lx.rect(0,0,pg.w,pg.h);lx.clip();
- if(act&&act.kind==='draw')drawStroke(lx,act.st,S.night);
+ if(act&&act.kind==='draw')drawStroke(lx,act.st,S.night,true);
  if(sel){lx.save();selXform(lx);for(const im of pg.images)if(sel.imgs.has(im)){const i=getImg(im.key);if(i)lx.drawImage(i,im.x,im.y,im.w,im.h)}for(const st of pg.strokes)if(sel.strokes.has(st))drawStroke(lx,st,S.night);lx.restore()}
  lx.restore();
  if(sel){const r=selRect();lx.save();lx.strokeStyle=S.night?'#8ea6ff':'#2448c8';lx.lineWidth=1.5*k;lx.setLineDash([6*k,4*k]);lx.strokeRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);lx.setLineDash([]);lx.beginPath();lx.arc(r.x1,r.y1,9*k,0,Math.PI*2);lx.fillStyle=lx.strokeStyle;lx.fill();lx.lineWidth=2.5*k;lx.strokeStyle='#fff';lx.stroke();lx.restore()}
@@ -426,13 +433,13 @@ function hitStroke(st,smp,R){const p=st.p,n=p.length/3;for(const q of smp){if(n=
 function eraseAt(a,b){const r=S.er.s/2,d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(d/(r*0.5))),smp=[];for(let i=0;i<=n;i++)smp.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});
  const mx0=Math.min(a.x,b.x)-r,my0=Math.min(a.y,b.y)-r,mx1=Math.max(a.x,b.x)+r,my1=Math.max(a.y,b.y)+r;let changed=false;const out=[];
  for(const st of pg.strokes){const bb=st.b;if(bb[2]<mx0||bb[0]>mx1||bb[3]<my0||bb[1]>my1){out.push(st);continue}
-  const hw=st.t==='hl'?st.s/2:penR(st.s,0.5),R=r+hw;
+  const hw=st.t==='hl'||st.k?st.s/2:penR(st.s,0.5),R=r+hw;
   if(!hitStroke(st,smp,R)){out.push(st);continue}changed=true;
   if(S.er.mode==='stroke')continue;
   const p=densify(st.p,Math.max(0.8,R/3)),runs=[];let run=[];
   for(let i=0;i<p.length;i+=3){let gone=false;for(const q of smp)if(Math.hypot(p[i]-q.x,p[i+1]-q.y)<R){gone=true;break}if(gone){if(run.length)runs.push(run);run=[]}else run.push(r2(p[i]),r2(p[i+1]),p[i+2])}
   if(run.length)runs.push(run);
-  for(const rp of runs){if(rp.length<6)continue;const ns={t:st.t,c:st.c,s:st.s,p:rp};ns.b=bboxOf(ns);out.push(ns)}}
+  for(const rp of runs){if(rp.length<6)continue;const ns=cloneSt(st,rp);ns.b=bboxOf(ns);out.push(ns)}}
  if(changed){pg.strokes=out;act.changed=true;scheduleRender()}}
 
 /* ---------- selection ---------- */
@@ -445,7 +452,7 @@ function finishLasso(poly){if(poly.length<8)return;const ss=new Set(),ii=new Set
  for(const im of pg.images)if(pip(im.x+im.w/2,im.y+im.h/2,poly))ii.add(im);
  if(ss.size||ii.size){makeSel(ss,ii);return}let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let i=0;i<poly.length;i+=2){x0=Math.min(x0,poly[i]);x1=Math.max(x1,poly[i]);y0=Math.min(y0,poly[i+1]);y1=Math.max(y1,poly[i+1])}x0=Math.max(0,x0);y0=Math.max(0,y0);x1=Math.min(pg.w,x1);y1=Math.min(pg.h,y1);if(x1-x0>15&&y1-y0>15){makeSel(ss,ii,[x0,y0,x1,y1]);toast('沒有圈到筆跡，可以截取這個範圍的圖')}}
 function applySel(snap){if(sel.dx===0&&sel.dy===0&&sel.sc===1){render();return}if(selEmpty()){const r=selRect();makeSel(sel.strokes,sel.imgs,[r.x0,r.y0,r.x1,r.y1]);return}pushUndo(snap);const ax=sel.ax,ay=sel.ay,dx=sel.dx,dy=sel.dy,k=sel.sc,ns=new Set(),ni=new Set();
- pg.strokes=pg.strokes.map(st=>{if(!sel.strokes.has(st))return st;const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(ax+(p[i]-ax)*k+dx);p[i+1]=r2(ay+(p[i+1]-ay)*k+dy)}const n={t:st.t,c:st.c,s:r2(st.s*k),p};n.b=bboxOf(n);ns.add(n);return n});
+ pg.strokes=pg.strokes.map(st=>{if(!sel.strokes.has(st))return st;const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(ax+(p[i]-ax)*k+dx);p[i+1]=r2(ay+(p[i+1]-ay)*k+dy)}const n=cloneSt(st,p,r2(st.s*k));n.b=bboxOf(n);ns.add(n);return n});
  pg.images=pg.images.map(im=>{if(!sel.imgs.has(im))return im;const n={...im,x:ax+(im.x-ax)*k+dx,y:ay+(im.y-ay)*k+dy,w:im.w*k,h:im.h*k};ni.add(n);return n});
  makeSel(ns,ni);markDirty()}
 function hitSel(e){if(!sel)return null;const r=selRect(),ex=e.clientX-SR.left,ey=e.clientY-SR.top,X=x=>x*cam.s+cam.tx,Y=y=>(y+pg._oy)*cam.s+cam.ty;if(Math.hypot(ex-X(r.x1),ey-Y(r.y1))<28)return 'handle';if(ex>=X(r.x0)-12&&ex<=X(r.x1)+12&&ey>=Y(r.y0)-12&&ey<=Y(r.y1)+12)return 'inside';return null}
@@ -462,11 +469,11 @@ selbar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!s
 /* ---------- clipboard & screenshot ---------- */
 let CLIP=null;try{CLIP=JSON.parse(localStorage.getItem('inkbook.clip')||'null')}catch(e){}
 function setClip(c){if(CLIP&&CLIP.tmp&&CLIP.tmp!==c.tmp)DB.del('blobs',CLIP.tmp).catch(()=>{});CLIP=c;try{localStorage.setItem('inkbook.clip',JSON.stringify(CLIP))}catch(e){}}
-function copySel(){const b=sel.box;setClip({box:[b[0],b[1],b[2],b[3]],strokes:pg.strokes.filter(s=>sel.strokes.has(s)).map(s=>({t:s.t,c:s.c,s:s.s,p:s.p})),images:pg.images.filter(i=>sel.imgs.has(i)).map(i=>({key:i.key,x:i.x,y:i.y,w:i.w,h:i.h}))})}
+function copySel(){const b=sel.box;setClip({box:[b[0],b[1],b[2],b[3]],strokes:pg.strokes.filter(s=>sel.strokes.has(s)).map(s=>cloneSt(s,s.p)),images:pg.images.filter(i=>sel.imgs.has(i)).map(i=>({key:i.key,x:i.x,y:i.y,w:i.w,h:i.h}))})}
 async function pasteSystem(px,py){try{const items=await navigator.clipboard.read();for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){const b=await it.getType(t);await insertImageFile(new File([b],'paste',{type:t}),{x:px,y:py});return}}toast('剪貼簿裡沒有圖片')}catch(e){toast('無法讀取剪貼簿，請改用「貼上」')}}
 async function pasteAt(px,py){if(!CLIP||!pg)return;const b=CLIP.box,w=b[2]-b[0],h=b[3]-b[1];let ox=clamp(px-w/2,0,Math.max(0,pg.w-w))-b[0],oy=clamp(py-h/2,0,Math.max(0,pg.h-h))-b[1];
  const ni=new Set(),ns=new Set();for(const im of CLIP.images){const r=await DB.get('blobs',im.key);if(!r)continue;const key=uid();await DB.put('blobs',{type:r.type,buf:r.buf},key);await loadImgP(key);ni.add({id:uid(),key,x:im.x+ox,y:im.y+oy,w:im.w,h:im.h})}
- for(const st of CLIP.strokes){const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(p[i]+ox);p[i+1]=r2(p[i+1]+oy)}const n={t:st.t,c:st.c,s:st.s,p};n.b=bboxOf(n);ns.add(n)}
+ for(const st of CLIP.strokes){const p=st.p.slice();for(let i=0;i<p.length;i+=3){p[i]=r2(p[i]+ox);p[i+1]=r2(p[i+1]+oy)}const n=cloneSt(st,p);n.b=bboxOf(n);ns.add(n)}
  if(!ns.size&&!ni.size){toast('沒有可以貼上的內容');return}pushUndo(snapshot());pg.images.push(...ni);pg.strokes.push(...ns);setTool('lasso');makeSel(ns,ni);placeSelBar();markDirty()}
 async function shotBlob(){const r=selRect(),pad=12,x0=Math.max(0,r.x0-pad),y0=Math.max(0,r.y0-pad),x1=Math.min(pg.w,r.x1+pad),y1=Math.min(pg.h,r.y1+pad),k=Math.min(2.5,4000/Math.max(x1-x0,y1-y0));
  for(const key of keysOf(pg))await loadImgP(key);const c=document.createElement('canvas');c.width=Math.max(1,Math.round((x1-x0)*k));c.height=Math.max(1,Math.round((y1-y0)*k));const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);g.setTransform(k,0,0,k,-x0*k,-y0*k);g.fillStyle='#fffefb';g.fillRect(0,0,pg.w,pg.h);drawContent(g,pg,false,null,null);const b=await toBlob(c,'image/png');c.width=0;b._box=[x0,y0,x1,y1];return b}
@@ -496,8 +503,8 @@ function startAct(e){try{stage.setPointerCapture(e.pointerId)}catch(_){}stopIner
  if(S.tool==='lasso'){const h=hitSel(e);if(h==='handle'){act.kind='scale';act.k0=sel.sc;act.A={x:sel.ax+sel.dx,y:sel.ay+sel.dy};act.d0=Math.max(1,Math.hypot(q.x-act.A.x,q.y-act.A.y))}else if(h==='inside'){act.kind='move';act.q0=q;act.d={x:sel.dx,y:sel.dy}}else{if(sel){sel=null;render()}act.kind='lasso';act.path=[q.x,q.y]}placeSelBar();drawLive();return}
  if(sel){sel=null;render()}
  if(S.tool==='eraser'){act.kind='erase';act.last=q;act.changed=false;cursor=q;eraseAt(q,q);liveQ();return}
- const hl=S.tool==='hl',cfg=hl?S.hl:S.pen,p=prs(e);act.kind='draw';act.st={t:hl?'hl':'pen',c:cfg.c,s:cfg.s,p:[r2(q.x),r2(q.y),r2(p)]};act.sx=q.x;act.sy=q.y;act.sp=p;drawLive()}
-function addPt(q,p){const st=act.st,a=st.p,n=a.length;act.sx+=(q.x-act.sx)*0.55;act.sy+=(q.y-act.sy)*0.55;act.sp+=(p-act.sp)*0.45;if(Math.hypot(act.sx-a[n-3],act.sy-a[n-2])*cam.s<0.8)return;a.push(r2(act.sx),r2(act.sy),r2(act.sp));
+ const hl=S.tool==='hl',cfg=hl?S.hl:S.pen,p=prs(e);act.kind='draw';act.st={t:hl?'hl':'pen',c:cfg.c,s:cfg.s,p:[r2(q.x),r2(q.y),r2(p)]};if(!hl){act.st.k=S.pen.k||'fp';act.st.o={th:S.pen.th,sl:S.pen.sl,sm:0.5,ts:S.pen.tp||0,te:S.pen.tp||0,sp:e.pointerType!=='pen'}}act.sx=q.x;act.sy=q.y;act.sp=p;drawLive()}
+function addPt(q,p){const st=act.st,a=st.p,n=a.length;if(st.k){if(Math.hypot(q.x-a[n-3],q.y-a[n-2])*cam.s<0.6)return;a.push(r2(q.x),r2(q.y),r2(p));act.sp=p;liveQ();return}act.sx+=(q.x-act.sx)*0.55;act.sy+=(q.y-act.sy)*0.55;act.sp+=(p-act.sp)*0.45;if(Math.hypot(act.sx-a[n-3],act.sy-a[n-2])*cam.s<0.8)return;a.push(r2(act.sx),r2(act.sy),r2(act.sp));
  if(st.t==='pen'){setCam(lx,pg);lx.fillStyle=nc(st.c,S.night);lx.beginPath();penPath(lx,a,st.s,a.length/3-1);lx.fill('nonzero')}else liveQ()}
 function moveAct(e){const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];const list=evs.length?evs:[e];act.cx=e.clientX;act.cy=e.clientY;
  for(const ev of list){const q=toPage(ev);
@@ -543,7 +550,7 @@ document.addEventListener('keydown',e=>{if($('#editor').hidden||e.target.tagName
 /* ---------- tools ui ---------- */
 function setTool(t){if(sel&&t!=='lasso'){sel=null;render()}S.tool=t;cursor=null;saveS();syncUI();drawLive()}
 function syncUI(){$$('.tool').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tool));const cfg=S.tool==='pen'?S.pen:S.tool==='hl'?S.hl:null,sw=$('#bSw');sw.classList.toggle('none',!cfg);if(cfg)sw.style.setProperty('--c',nc(cfg.c,S.night));$('#pnum').textContent=`${cur+1} / ${pages.length}`;$('#bPrev').disabled=cur<=0;$('#bNext').disabled=cur>=pages.length-1;syncUndo()}
-function drawPrev(){const c=$('#pPrev');if(!c)return;const t=S.tool,cfg=t==='hl'?S.hl:S.pen,W=c.clientWidth||270,H=c.clientHeight||44,d=Math.min(2,devicePixelRatio||1);c.width=W*d;c.height=H*d;const g=c.getContext('2d');g.scale(d,d);const p=[];for(let i=0;i<=60;i++){const x=16+(W-32)*i/60;p.push(x,H/2+Math.sin(i/60*Math.PI*2)*H*0.22,t==='hl'?0.5:0.15+0.7*Math.sin(i/60*Math.PI))}g.fillStyle=paperCol(S.night);g.fillRect(0,0,W,H);drawStroke(g,{t:t==='hl'?'hl':'pen',c:cfg.c,s:cfg.s,p},S.night)}
+function drawPrev(){const c=$('#pPrev');if(!c)return;const t=S.tool,cfg=t==='hl'?S.hl:S.pen,W=c.clientWidth||270,H=c.clientHeight||44,d=Math.min(2,devicePixelRatio||1);c.width=W*d;c.height=H*d;const g=c.getContext('2d');g.scale(d,d);const p=[];for(let i=0;i<=60;i++){const x=16+(W-32)*i/60;p.push(x,H/2+Math.sin(i/60*Math.PI*2)*H*0.22,t==='hl'?0.5:0.15+0.7*Math.sin(i/60*Math.PI))}g.fillStyle=paperCol(S.night);g.fillRect(0,0,W,H);const st={t:t==='hl'?'hl':'pen',c:cfg.c,s:cfg.s,p};if(t!=='hl'){st.k=S.pen.k;st.o={th:S.pen.th,sl:S.pen.sl,sm:0.5,ts:S.pen.tp,te:S.pen.tp}}drawStroke(g,st,S.night)}
 function toolPop(anchor){const t=S.tool;
  if(t==='lasso'){openPop(anchor,`<div class="ph">套索</div><p class="hint">用筆圈起筆跡或圖片。選取後可以拖曳移動、拉右下角的圓點縮放，也能換顏色、複製或刪除。</p>`);return}
  if(t==='eraser'){openPop(anchor,`<div class="ph">橡皮擦</div><div class="seg"><button data-m="stroke" class="${S.er.mode==='stroke'?'on':''}">整筆擦除</button><button data-m="pixel" class="${S.er.mode==='pixel'?'on':''}">局部擦除</button></div><label class="sl">大小<input type="range" id="pS" min="6" max="80" value="${S.er.s}"><output>${S.er.s}</output></label><div class="hr"></div><button class="mi d" id="pClr"><span>清除這一頁的筆跡和圖片</span></button>`,el=>{
@@ -551,7 +558,7 @@ function toolPop(anchor){const t=S.tool;
   const s=el.querySelector('#pS');s.oninput=()=>{S.er.s=+s.value;s.nextElementSibling.textContent=s.value;saveS()};
   el.querySelector('#pClr').onclick=async()=>{closePop();if(!pg.strokes.length&&!pg.images.length)return;if(await modal({title:'清除這一頁？',text:'會清除這一頁所有筆跡和圖片（PDF 底圖會保留）。可以用復原找回。',ok:'清除',danger:true})){pushUndo(snapshot());pg.strokes=[];pg.images=[];sel=null;render();markDirty()}}});return}
  const cfg=t==='pen'?S.pen:S.hl,cols=t==='pen'?PEN_C:HL_C;
- openPop(anchor,`<div class="ph">${t==='pen'?'鋼筆':'螢光筆'}</div><div class="cols">${cols.map(c=>`<button class="cdot ${c===cfg.c?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" id="pC" value="${cfg.c}"></label></div><label class="sl">粗細<input type="range" id="pS" min="${t==='pen'?0.5:6}" max="${t==='pen'?16:48}" step="${t==='pen'?0.5:1}" value="${cfg.s}"><output>${cfg.s}</output></label><canvas id="pPrev"></canvas>`,el=>{
+ openPop(anchor,`<div class="ph">${t==='pen'?'鋼筆':'螢光筆'}</div><div class="cols">${cols.map(c=>`<button class="cdot ${c===cfg.c?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" id="pC" value="${cfg.c}"></label></div><label class="sl">粗細<input type="range" id="pS" min="${t==='pen'?0.5:6}" max="${t==='pen'?16:48}" step="${t==='pen'?0.5:1}" value="${cfg.s}"><output>${cfg.s}</output></label><canvas id="pPrev"></canvas>${t==='pen'?`<div class="seg" style="margin-top:10px" id="pK"><button data-k="fp" class="${S.pen.k!=='bp'?'on':''}">鋼筆（有筆壓）</button><button data-k="bp" class="${S.pen.k==='bp'?'on':''}">原子筆（粗細一致）</button></div><label class="sl" id="pThL" ${S.pen.k==='bp'?'hidden':''}>筆壓變化<input type="range" id="pTh" min="0" max="0.9" step="0.05" value="${S.pen.th}"><output>${Math.round(S.pen.th*100)}</output></label><label class="sl">平滑（防手抖）<input type="range" id="pSl" min="0" max="0.9" step="0.05" value="${S.pen.sl}"><output>${Math.round(S.pen.sl*100)}</output></label><label class="sl">頭尾變細<input type="range" id="pTp" min="0" max="60" step="5" value="${S.pen.tp||0}"><output>${S.pen.tp||0}</output></label>`:''}`,el=>{if(t==='pen'){el.querySelector('#pK').onclick=ev=>{const b=ev.target.closest('[data-k]');if(!b)return;S.pen.k=b.dataset.k;saveS();el.querySelectorAll('[data-k]').forEach(x=>x.classList.toggle('on',x===b));el.querySelector('#pThL').hidden=S.pen.k==='bp';drawPrev()};for(const [id,key,mul] of [['pTh','th',100],['pSl','sl',100],['pTp','tp',1]]){const r=el.querySelector('#'+id);r.oninput=()=>{S.pen[key]=+r.value;r.nextElementSibling.textContent=Math.round(r.value*mul);saveS();drawPrev()}}}
   el.querySelector('.cols').onclick=ev=>{const d=ev.target.closest('[data-c]');if(!d)return;cfg.c=d.dataset.c;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.toggle('on',x===d));syncUI();drawPrev()};
   el.querySelector('#pC').oninput=ev=>{cfg.c=ev.target.value;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.remove('on'));syncUI();drawPrev()};
   const s=el.querySelector('#pS');s.oninput=()=>{cfg.s=+s.value;s.nextElementSibling.textContent=s.value;saveS();drawPrev()};drawPrev()})}
@@ -660,6 +667,52 @@ async function importPdf(file,into){let L;busy('正在準備 PDF 工具…',0);t
   else{target.pageIds=made.map(p=>p.id);target.cover=made[0]&&made[0].thumb;await DB.put('nbs',target);busy(null);openNb(target.id)}
  }catch(e){busy(null);toast(e&&e.name==='PasswordException'?'這個 PDF 有密碼保護，無法匯入':'匯入失敗：'+(e&&e.message||e))}}
 
+/* ---------- Saber import ---------- */
+function parseBson(buf){const dv=new DataView(buf),u8=new Uint8Array(buf),td=new TextDecoder();
+ const cstr=i=>{let j=i;while(u8[j])j++;return [td.decode(u8.subarray(i,j)),j+1]};
+ const doc=(i,arr)=>{const len=dv.getInt32(i,true),end=i+len-1;i+=4;const o=arr?[]:{};while(i<end){const t=u8[i++];let k;[k,i]=cstr(i);let v=null,l;
+  switch(t){case 1:v=dv.getFloat64(i,true);i+=8;break;case 2:l=dv.getInt32(i,true);v=td.decode(u8.subarray(i+4,i+4+l-1));i+=4+l;break;case 3:case 4:l=dv.getInt32(i,true);v=doc(i,t===4);i+=l;break;case 5:l=dv.getInt32(i,true);v=u8.slice(i+5,i+5+l);i+=5+l;break;case 7:i+=12;break;case 8:v=!!u8[i];i+=1;break;case 9:case 18:v=Number(dv.getBigInt64(i,true));i+=8;break;case 10:break;case 16:v=dv.getInt32(i,true);i+=4;break;case 17:i+=8;break;case 19:i+=16;break;default:throw new Error('無法解析的資料（類型 '+t+'）')}
+  if(arr)o.push(v);else o[k]=v}return o};
+ return doc(0,false)}
+async function readZip(buf){const dv=new DataView(buf),u8=new Uint8Array(buf);let e=-1;for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}if(e<0)throw new Error('不是有效的壓縮檔');
+ const n=dv.getUint16(e+10,true);let q=dv.getUint32(e+16,true);const files={},td=new TextDecoder();
+ for(let k=0;k<n;k++){const method=dv.getUint16(q+10,true),cs=dv.getUint32(q+20,true),nl=dv.getUint16(q+28,true),xl=dv.getUint16(q+30,true),cl=dv.getUint16(q+32,true),lho=dv.getUint32(q+42,true);const name=td.decode(u8.subarray(q+46,q+46+nl));q+=46+nl+xl+cl;const st=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);files[name]={method,data:u8.subarray(st,st+cs)}}
+ return {names:Object.keys(files),async get(name){const f=files[name];if(!f)return null;if(f.method===0)return f.data.slice();if(f.method===8){if(typeof DecompressionStream==='undefined')throw new Error('這個瀏覽器不支援解壓縮，請更新 iPadOS');const out=await new Response(new Blob([f.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();return new Uint8Array(out)}throw new Error('不支援的壓縮方式')}}}
+const argbHex=c=>{if(c==null)return '#000000';c=Number(c)>>>0;return '#'+(c&0xFFFFFF).toString(16).padStart(6,'0')};
+function saberStroke(j,k){const ty=j.ty||'fountainPen',pts=[],ox=j.ox||0,oy=j.oy||0;let hasP=false;
+ if(j.shape==='circle'){const cx=j.cx||0,cy=j.cy||0,r=j.r||0;for(let i=0;i<=72;i++){const a=i/72*Math.PI*2;pts.push(r2((cx+Math.cos(a)*r)*k),r2((cy+Math.sin(a)*r)*k),0.5)}}
+ else if(j.shape==='rect'){const x=j.rl||0,y=j.rt||0,w=j.rw||0,h=j.rh||0;for(const [a,b] of [[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x,y]])pts.push(r2(a*k),r2(b*k),0.5)}
+ else for(const q of j.p||[]){let x,y,pr;if(q instanceof Uint8Array){const f=new Float32Array(q.buffer,q.byteOffset,Math.floor(q.byteLength/4));x=f[0];y=f[1];pr=f.length>2?f[2]:null}else if(Array.isArray(q)){[x,y,pr]=q}else if(q){x=q.x;y=q.y;pr=q.p}if(!isFinite(x)||!isFinite(y))continue;if(pr!=null&&isFinite(pr))hasP=true;pts.push(r2((x+ox)*k),r2((y+oy)*k),pr!=null&&isFinite(pr)?r2(clamp(pr,0,1)):0.5)}
+ if(!pts.length)return null;const size=(j.s??10)*k;
+ if(ty==='Highlighter'){const st={t:'hl',c:argbHex(j.c),s:r2(size),p:pts};st.b=bboxOf(st);return st}
+ if(ty==='Eraser'||ty==='LaserPointer')return null;
+ const shape=ty==='ShapePen'||!!j.shape;const st={t:'pen',c:argbHex(j.c),s:r2(Math.max(0.3,size)),p:pts,k:(ty==='ballpointPen'||shape)?'bp':'fp',o:{th:j.t??0.5,sm:shape?0:(j.sm??0),sl:shape?0:(j.sl??0.5),sp:j.sp??!hasP,ts:j.ts>0?j.ts*k:0,te:j.te>0?j.te*k:0}};st.b=bboxOf(st);return st}
+async function importSaber(file){busy('正在匯入 Saber 筆記…',0.05);try{
+ const buf=await file.arrayBuffer(),head=new Uint8Array(buf,0,Math.min(4,buf.byteLength));let main,getAsset=async()=>null;const name=file.name.replace(/\.(sba|sbn2|sbn)$/i,'')||'Saber 筆記';
+ const toAB=u=>u.buffer.slice(u.byteOffset,u.byteOffset+u.byteLength);
+ if(head[0]===0x50&&head[1]===0x4b){const z=await readZip(buf);const mn=z.names.find(n=>/\.sbn2$/i.test(n))||z.names.find(n=>/\.sbn$/i.test(n));if(!mn)throw new Error('壓縮檔裡找不到 Saber 筆記');const mb=await z.get(mn);main=/\.sbn$/i.test(mn)?JSON.parse(new TextDecoder().decode(mb)):parseBson(toAB(mb));getAsset=i=>z.get(mn+'.'+i)}
+ else if(head[0]===0x7b)main=JSON.parse(new TextDecoder().decode(buf));else main=parseBson(buf);
+ const inline=main.a||[],assetOf=async i=>{if(i==null)return null;if(inline[i])return inline[i] instanceof Uint8Array?inline[i]:null;return getAsset(i)};
+ const pat=({college:'lined',lined:'lined',grid:'grid',dots:'dot'})[main.p]||'blank';
+ let pj=main.z;if(!pj){const W=main.w||1000,H=main.h||1400,n=Math.max(1,...(main.s||[]).map(x=>(x.i||0)+1),...(main.i||[]).map(x=>(x.i||0)+1));pj=[];for(let i=0;i<n;i++)pj.push({w:W,h:H,s:(main.s||[]).filter(x=>(x.i||0)===i),i:(main.i||[]).filter(x=>(x.i||0)===i)})}
+ if(!pj.length)throw new Error('這份筆記沒有任何頁面');
+ const nbo={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0},made=[],pdfDocs={};let skipped=0;
+ const mime=e=>({'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.svg':'image/svg+xml'})[(e||'').toLowerCase()]||'image/png';
+ const saveBlob=async(bytes,type)=>{const key=uid();await DB.put('blobs',{type,buf:toAB(bytes)},key);return key};
+ const pdfBg=async(img)=>{let doc=pdfDocs[img.a];if(!doc){const bytes=await assetOf(img.a);if(!bytes)return null;const L=await loadPdfJs();doc=pdfDocs[img.a]=await L.getDocument({data:bytes,isEvalSupported:false,useWorkerFetch:false,CMapReaderFactory:PdfCMap,StandardFontDataFactory:PdfFont,useSystemFonts:true}).promise}const page=await doc.getPage((img.pdfi||0)+1),v1=page.getViewport({scale:1}),sc=Math.min(2000/v1.width,Math.sqrt(6e6/(v1.width*v1.height))),vp=page.getViewport({scale:sc}),c=document.createElement('canvas');c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await page.render({canvasContext:g,viewport:vp}).promise;const b=await toBlob(c,'image/jpeg',0.88);c.width=0;return saveBlob(new Uint8Array(await b.arrayBuffer()),'image/jpeg')};
+ for(let pi=0;pi<pj.length;pi++){busy(`正在匯入第 ${pi+1} / ${pj.length} 頁…`,pi/pj.length);const P=pj[pi]||{},W=P.w||1000,H=P.h||1400,k=1000/W;
+  const page={id:uid(),nb:nbo.id,w:1000,h:Math.round(H*k),paper:pat,bg:null,strokes:[],images:[],thumb:null};
+  if(P.b){try{if(/pdf/i.test(P.b.e||''))page.bg=await pdfBg(P.b);else{const by=await assetOf(P.b.a);if(by)page.bg=await saveBlob(by,mime(P.b.e))}if(page.bg)page.paper='blank'}catch(e){skipped++}}
+  for(const im of P.i||[]){try{let key=null;if(/pdf/i.test(im.e||''))key=await pdfBg(im);else{const by=await assetOf(im.a);if(by)key=await saveBlob(by,mime(im.e))}if(key)page.images.push({id:uid(),key,x:(im.x||0)*k,y:(im.y||0)*k,w:(im.w||100)*k,h:(im.h||100)*k});else skipped++}catch(e){skipped++}}
+  for(const sj of P.s||[]){try{const st=saberStroke(sj,k);if(st)page.strokes.push(st)}catch(e){skipped++}}
+  try{for(const key of keysOf(page))await loadImgP(key);page.thumb=makeThumb(page)}catch(e){}
+  await DB.put('pages',ser(page));made.push(page.id)}
+ for(const d of Object.values(pdfDocs))try{d.destroy()}catch(_){}
+ nbo.pageIds=made;const first=await DB.get('pages',made[0]);nbo.cover=first&&first.thumb;await DB.put('nbs',nbo);busy(null);evictExcept(new Set());
+ toast(`已匯入 ${made.length} 頁`+(skipped?`（有 ${skipped} 個項目無法匯入）`:'')+((pj.some(x=>x&&x.q&&x.q.length>1))?'；文字方塊目前不支援':''));openNb(nbo.id)
+ }catch(e){busy(null);toast('匯入失敗：'+(e&&e.message||e))}}
+$('#fSaber').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importSaber(f)};
+
 /* ---------- export ---------- */
 async function renderExport(c,p){const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);for(const k of keysOf(p))await loadImgP(k);const k=c.width/p.w;g.setTransform(k,0,0,k,0,0);drawContent(g,p,false,null,null)}
 async function exportPng(){busy('正在匯出圖片…',0.3);try{const c=document.createElement('canvas');c.width=2000;c.height=Math.round(2000*pg.h/pg.w);await renderExport(c,pg);const b=await toBlob(c,'image/png');c.width=0;busy(null);await saveFile(safeName(nb.name)+`-第${cur+1}頁.png`,b)}catch(e){busy(null);toast('匯出失敗：'+(e&&e.message||e))}}
@@ -687,8 +740,8 @@ async function openNb(id){const n=await DB.get('nbs',id);if(!n){toast('找不到
 async function showHome(){closePop();stopInertia();if(act)cancelAct();sel=null;HU=[];HR=[];for(const p of pages)dropCache(p);await flush();pg=null;nb=null;pages=[];evictExcept(new Set());selbar.hidden=true;$('#drawer').hidden=true;$('#editor').hidden=true;$('#home').hidden=false;renderHome()}
 $('#hNew').onclick=async()=>{const list=await DB.all('nbs');const name=await modal({title:'新筆記本',input:`筆記本 ${list.length+1}`,ok:'建立',html:`<p style="margin:0">紙張：可在筆記本內的「⋯」更換</p>`});if(!name)return;nb={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0};const p=newPage();pages=[p];markDirty(p);await flush();openNb(nb.id)};
 $('#hPdf').onclick=()=>{pdfInto=false;$('#fPdf').click()};
-$('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{
- el.querySelector('#xBak').onclick=()=>{closePop();backup()};el.querySelector('#xRes').onclick=()=>{closePop();$('#fBak').click()};
+$('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><button class="mi" id="xSab"><span>匯入 Saber 筆記<small>支援 .sba、.sbn2、.sbn 檔，筆跡可以繼續編輯</small></span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{
+ el.querySelector('#xBak').onclick=()=>{closePop();backup()};el.querySelector('#xRes').onclick=()=>{closePop();$('#fBak').click()};el.querySelector('#xSab').onclick=()=>{closePop();$('#fSaber').click()};
  el.querySelector('#xNight').onchange=ev=>{S.night=ev.target.checked;saveS();applyNight()};
  try{navigator.storage.estimate().then(u=>{const x=el.querySelector('#xUse');if(x)x.textContent=`目前使用 ${(u.usage/1048576).toFixed(1)} MB`})}catch(_){}});
 async function backup(){busy('正在備份…',0);try{const nbs=await DB.all('nbs'),pgs=await DB.all('pages'),keys=await DB.keys('blobs'),parts=['{"app":"inkbook","v":1,"nbs":',JSON.stringify(nbs),',"pages":',JSON.stringify(pgs),',"blobs":{'];let cnt=0;

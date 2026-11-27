@@ -75,7 +75,10 @@ html[data-night] .btn.ghost{color:var(--acc)}
 #selbar{position:fixed;z-index:6;display:flex;gap:2px;padding:4px;border-radius:14px;background:var(--bar);box-shadow:var(--sh)}
 #selbar button{height:38px;padding:0 12px;border-radius:10px;font-size:15px;white-space:nowrap}
 #selbar button:active{background:var(--accs)}
-#selbar .d{color:var(--danger)}
+#selbar .d,#notebar .d{color:var(--danger)}
+#notebar{position:fixed;z-index:6;display:flex;gap:2px;padding:4px;border-radius:14px;background:var(--bar);box-shadow:var(--sh)}
+#notebar button{height:38px;padding:0 12px;border-radius:10px;font-size:15px;white-space:nowrap}
+#notebar .acc{color:var(--acc);font-weight:600}
 #selbar .acc{color:var(--acc);font-weight:600}
 #selbar.area .ink{display:none}
 #selbar{flex-wrap:wrap;max-width:calc(100vw - 16px);justify-content:center}
@@ -226,8 +229,9 @@ input.tg:checked::after{transform:translateX(20px)}
   <button class="ib" id="bAdd" aria-label="新增頁面"><svg class="i"><use href="#i-plus"/></svg></button>
  </div>
  <div id="selbar" class="float" hidden>
-  <button data-a="shot" class="acc">截圖</button><button data-a="copy" class="ink">拷貝</button><button data-a="cut" class="ink">剪下</button><button data-a="color" class="ink">顏色</button><button data-a="del" class="d ink">刪除</button><button data-a="done">完成</button>
+  <button data-a="note" class="acc">便條</button><button data-a="shot" class="acc">截圖</button><button data-a="copy" class="ink">拷貝</button><button data-a="cut" class="ink">剪下</button><button data-a="color" class="ink">顏色</button><button data-a="del" class="d ink">刪除</button><button data-a="done">完成</button>
  </div>
+ <div id="notebar" class="float" hidden><button data-a="size">調整大小</button><button data-a="del" class="d">刪除便條</button><button data-a="close" class="acc">收合</button></div>
  <aside id="drawer" hidden>
   <div class="dh"><b>頁面</b><button class="ib" id="dClose" aria-label="關閉"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div id="dlist"></div>
@@ -339,7 +343,8 @@ function drawPaper(ctx,p,night){if(p.paper==='blank'||!p.paper)return;ctx.save()
  else if(p.paper==='grid'){for(let x=g;x<p.w;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,p.h)}for(let y=g;y<p.h;y+=g){ctx.moveTo(0,y);ctx.lineTo(p.w,y)}ctx.stroke()}
  else if(p.paper==='dot'){for(let x=g;x<p.w;x+=g)for(let y=g;y<p.h;y+=g){ctx.moveTo(x+1.7,y);ctx.arc(x,y,1.7,0,Math.PI*2)}ctx.fill()}
  ctx.restore()}
-function drawContent(ctx,p,night,vis,sx){
+function drawContent(ctx,p,night,vis,sx){drawContent2(ctx,p,night,vis,sx);drawMarkers(ctx,p,night)}
+function drawContent2(ctx,p,night,vis,sx){
  if(p.bg){const im=getImg(p.bg);if(im)ctx.drawImage(night&&S.invertPdf?(getInv(p.bg)||im):im,0,0,p.w,p.h)}
  drawPaper(ctx,p,night);
  for(const im of p.images){if(sx&&sx.imgs.has(im))continue;const i=getImg(im.key);if(i)ctx.drawImage(i,im.x,im.y,im.w,im.h);else{ctx.fillStyle='rgba(128,128,128,.15)';ctx.fillRect(im.x,im.y,im.w,im.h)}}
@@ -348,8 +353,8 @@ function drawContent(ctx,p,night,vis,sx){
 /* ---------- state ---------- */
 let nb=null,pages=[],pg=null,cur=0,sel=null,act=null,cursor=null;
 const dirty=new Set();let saveT=null;
-function ser(p){return {id:p.id,nb:p.nb,w:p.w,h:p.h,paper:p.paper,bg:p.bg,strokes:p.strokes.map(s=>cloneSt(s,s.p)),images:p.images.map(i=>({id:i.id,key:i.key,x:i.x,y:i.y,w:i.w,h:i.h})),thumb:p.thumb||null}}
-function deser(r){return {...r,strokes:(r.strokes||[]).map(s=>{const n=cloneSt(s,s.p);n.b=bboxOf(n);return n}),images:(r.images||[]).map(i=>({...i}))}}
+function ser(p){return {id:p.id,nb:p.nb,w:p.w,h:p.h,paper:p.paper,bg:p.bg,notes:(p.notes||[]).map(n=>({id:n.id,a:n.a,sz:n.sz||0,strokes:n.strokes.map(s=>cloneSt(s,s.p))})),strokes:p.strokes.map(s=>cloneSt(s,s.p)),images:p.images.map(i=>({id:i.id,key:i.key,x:i.x,y:i.y,w:i.w,h:i.h})),thumb:p.thumb||null}}
+function deser(r){return {...r,notes:(r.notes||[]).map(n=>({id:n.id,a:n.a,sz:n.sz||0,strokes:(n.strokes||[]).map(s=>{const m=cloneSt(s,s.p);m.b=bboxOf(m);return m})})),strokes:(r.strokes||[]).map(s=>{const n=cloneSt(s,s.p);n.b=bboxOf(n);return n}),images:(r.images||[]).map(i=>({...i}))}}
 function newPage(paper){return {id:uid(),nb:nb.id,w:1000,h:1414,paper:paper||S.paper,bg:null,strokes:[],images:[],thumb:null}}
 function markDirty(p){p=p||pg;if(!p)return;p._ver=(p._ver||0)+1;dirty.add(p);if(saveState==='ok')setSave('saving');p._td=true;clearTimeout(saveT);saveT=setTimeout(flush,800)}
 let flushing=Promise.resolve();
@@ -398,6 +403,7 @@ function draw(fast){bx.setTransform(1,0,0,1,0,0);bx.clearRect(0,0,cv0.width,cv0.
   const direct=p===pg&&(sel||(act&&act.kind==='erase'));
   if(!direct){const cap=capOf(p),want=Math.min(need,cap);if(!cacheOk(p)||(!fast&&p._cache.s<want*0.97))buildCache(p,want);if(fast||p._cache.s>=need*0.97){bx.drawImage(p._cache.canvas,0,0,p.w,p.h);continue}}
   bx.save();bx.beginPath();bx.rect(0,0,p.w,p.h);bx.clip();drawContent(bx,p,S.night,{x0:-cam.tx/cam.s,y0:-cam.ty/cam.s-p._oy,x1:(SW-cam.tx)/cam.s,y1:(SH-cam.ty)/cam.s-p._oy},p===pg?sel:null);bx.restore()}
+ if(openNote&&visPages().includes(openNote.p)){const n=noteOf(openNote.p,openNote.id);if(n){setCam(bx,openNote.p);drawNotePanel(bx,openNote.p,n,S.night,null)}else openNote=null}
  drawLive()}
 function render(){if(rq){cancelAnimationFrame(rq);rq=0}draw(false);placeSelBar();if(pg){const vis=visPages(),keep=new Set(),near=new Set();for(const p of vis){const i=pages.indexOf(p);for(const q of [pages[i-1],p,pages[i+1]])if(q)near.add(q)}for(const p of pages)if(!near.has(p)&&p._cache)dropCache(p);for(const p of near)for(const k of keysOf(p))keep.add(k);evictExcept(keep)}}
 function stopInertia(){if(inertia){cancelAnimationFrame(inertia);inertia=0}}
@@ -405,9 +411,9 @@ function startInertia(vx,vy){let last=now();const step=()=>{const t=now(),dt=Mat
 function commitCam(){clampCam();render()}
 function selXform(ctx){ctx.translate(sel.ax+sel.dx,sel.ay+sel.dy);ctx.scale(sel.sc,sel.sc);ctx.translate(-sel.ax,-sel.ay)}
 function selRect(){const b=sel.box;return {x0:b[0]+sel.dx,y0:b[1]+sel.dy,x1:b[0]+sel.dx+(b[2]-b[0])*sel.sc,y1:b[1]+sel.dy+(b[3]-b[1])*sel.sc}}
-function drawLive(){if(lq){cancelAnimationFrame(lq);lq=0}lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,cv1.width,cv1.height);if(!pg||!SW)return;setCam(lx,pg);const k=1/cam.s;
+function drawLive(){if(lq){cancelAnimationFrame(lq);lq=0}lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,cv1.width,cv1.height);if(!pg||!SW)return;setCam(lx,pg);if(act&&act.note){const n=noteOf(pg,act.note);if(n){const r=notePanel(pg,n);lx.save();lx.beginPath();lx.rect(r.x,r.y,r.w,r.h);lx.clip();lx.translate(r.x,r.y);if(act.kind==='draw')drawStroke(lx,act.st,S.night,true);lx.restore()}}const k=1/cam.s;
  lx.save();lx.beginPath();lx.rect(0,0,pg.w,pg.h);lx.clip();
- if(act&&act.kind==='draw')drawStroke(lx,act.st,S.night,true);
+ if(act&&act.kind==='draw'&&!act.note)drawStroke(lx,act.st,S.night,true);
  if(sel){lx.save();selXform(lx);for(const im of pg.images)if(sel.imgs.has(im)){const i=getImg(im.key);if(i)lx.drawImage(i,im.x,im.y,im.w,im.h)}for(const st of pg.strokes)if(sel.strokes.has(st))drawStroke(lx,st,S.night);lx.restore()}
  lx.restore();
  if(sel){const r=selRect();lx.save();lx.strokeStyle=S.night?'#8ea6ff':'#2448c8';lx.lineWidth=1.5*k;lx.setLineDash([6*k,4*k]);lx.strokeRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);lx.setLineDash([]);lx.beginPath();lx.arc(r.x1,r.y1,9*k,0,Math.PI*2);lx.fillStyle=lx.strokeStyle;lx.fill();lx.lineWidth=2.5*k;lx.strokeStyle='#fff';lx.stroke();lx.restore()}
@@ -415,10 +421,10 @@ function drawLive(){if(lq){cancelAnimationFrame(lq);lq=0}lx.setTransform(1,0,0,1
  if(cursor&&S.tool==='eraser'){lx.save();lx.beginPath();lx.arc(cursor.x,cursor.y,S.er.s/2,0,Math.PI*2);lx.fillStyle=S.night?'rgba(255,255,255,.08)':'rgba(0,0,0,.05)';lx.fill();lx.strokeStyle=S.night?'rgba(255,255,255,.6)':'rgba(0,0,0,.45)';lx.lineWidth=1.2*k;lx.stroke();lx.restore()}}
 
 /* ---------- history ---------- */
-const snapshot=()=>({strokes:pg.strokes.slice(),images:pg.images.slice()});
+const snapshot=()=>({strokes:pg.strokes.slice(),images:pg.images.slice(),notes:(pg.notes||[]).slice()});
 let HU=[],HR=[];
 function pushUndo(s){HU.push({p:pg,s});if(HU.length>200)HU.shift();HR.length=0;syncUndo()}
-function histStep(from,to){if(!pg||act)return;let e;while((e=from.pop())&&!pages.includes(e.p));if(!e)return syncUndo();const p=e.p;to.push({p,s:{strokes:p.strokes.slice(),images:p.images.slice()}});p.strokes=e.s.strokes;p.images=e.s.images;sel=null;if(p!==pg){pg=p;cur=pages.indexOf(p);if(vMode()){const top=(p._oy)*cam.s+cam.ty;if(top>SH*0.8||top+p.h*cam.s<SH*0.1){cam.ty=14-p._oy*cam.s;clampCam()}}else{goPage(cur)}}markDirty(p);render();syncUI()}
+function histStep(from,to){if(!pg||act)return;let e;while((e=from.pop())&&!pages.includes(e.p));if(!e)return syncUndo();const p=e.p;to.push({p,s:{strokes:p.strokes.slice(),images:p.images.slice(),notes:(p.notes||[]).slice()}});p.strokes=e.s.strokes;p.images=e.s.images;if(e.s.notes)p.notes=e.s.notes;dropCache(p);if(openNote&&openNote.p===p&&!noteOf(p,openNote.id))openNote=null;sel=null;if(p!==pg){pg=p;cur=pages.indexOf(p);if(vMode()){const top=(p._oy)*cam.s+cam.ty;if(top>SH*0.8||top+p.h*cam.s<SH*0.1){cam.ty=14-p._oy*cam.s;clampCam()}}else{goPage(cur)}}markDirty(p);render();syncUI()}
 function undo(){histStep(HU,HR)}
 function redo(){histStep(HR,HU)}
 function syncUndo(){$('#bUndo').disabled=!HU.length;$('#bRedo').disabled=!HR.length}
@@ -430,7 +436,8 @@ function densify(p,md){const o=[p[0],p[1],p[2]];for(let i=3;i<p.length;i+=3){con
 function hitStroke(st,smp,R){const p=st.p,n=p.length/3;for(const q of smp){if(n===1){if(Math.hypot(q.x-p[0],q.y-p[1])<R)return true;continue}for(let i=3;i<p.length;i+=3)if(segD(q.x,q.y,p[i-3],p[i-2],p[i],p[i+1])<R)return true}return false}
 
 /* ---------- erase ---------- */
-function eraseAt(a,b){const r=S.er.s/2,d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(d/(r*0.5))),smp=[];for(let i=0;i<=n;i++)smp.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});
+function eraseNote(a,b){const n=noteOf(pg,act.note);if(!n)return;const saved=pg.strokes;pg.strokes=n.strokes;const was=act.changed;act.changed=false;eraseAt(a,b,true);const out=pg.strokes,ch=act.changed;pg.strokes=saved;act.changed=was||ch;if(ch){replaceNote({...n,strokes:out});scheduleRender()}}
+function eraseAt(a,b,noRender){const r=S.er.s/2,d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(d/(r*0.5))),smp=[];for(let i=0;i<=n;i++)smp.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});
  const mx0=Math.min(a.x,b.x)-r,my0=Math.min(a.y,b.y)-r,mx1=Math.max(a.x,b.x)+r,my1=Math.max(a.y,b.y)+r;let changed=false;const out=[];
  for(const st of pg.strokes){const bb=st.b;if(bb[2]<mx0||bb[0]>mx1||bb[3]<my0||bb[1]>my1){out.push(st);continue}
   const hw=st.t==='hl'||st.k?st.s/2:penR(st.s,0.5),R=r+hw;
@@ -440,7 +447,7 @@ function eraseAt(a,b){const r=S.er.s/2,d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(
   for(let i=0;i<p.length;i+=3){let gone=false;for(const q of smp)if(Math.hypot(p[i]-q.x,p[i+1]-q.y)<R){gone=true;break}if(gone){if(run.length)runs.push(run);run=[]}else run.push(r2(p[i]),r2(p[i+1]),p[i+2])}
   if(run.length)runs.push(run);
   for(const rp of runs){if(rp.length<6)continue;const ns=cloneSt(st,rp);ns.b=bboxOf(ns);out.push(ns)}}
- if(changed){pg.strokes=out;act.changed=true;scheduleRender()}}
+ if(changed){pg.strokes=out;act.changed=true;if(!noRender)scheduleRender()}}
 
 /* ---------- selection ---------- */
 function selBox(){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const st of sel.strokes){const b=st.b;x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3])}for(const im of sel.imgs){x0=Math.min(x0,im.x);y0=Math.min(y0,im.y);x1=Math.max(x1,im.x+im.w);y1=Math.max(y1,im.y+im.h)}return [x0,y0,x1,y1]}
@@ -457,10 +464,11 @@ function applySel(snap){if(sel.dx===0&&sel.dy===0&&sel.sc===1){render();return}i
  makeSel(ns,ni);markDirty()}
 function hitSel(e){if(!sel)return null;const r=selRect(),ex=e.clientX-SR.left,ey=e.clientY-SR.top,X=x=>x*cam.s+cam.tx,Y=y=>(y+pg._oy)*cam.s+cam.ty;if(Math.hypot(ex-X(r.x1),ey-Y(r.y1))<28)return 'handle';if(ex>=X(r.x0)-12&&ex<=X(r.x1)+12&&ey>=Y(r.y0)-12&&ey<=Y(r.y1)+12)return 'inside';return null}
 const selbar=$('#selbar');
-function placeSelBar(){if(!sel||act||$('#editor').hidden){selbar.hidden=true;return}selbar.classList.toggle('area',selEmpty());const r=selRect(),X=x=>SR.left+x*cam.s+cam.tx,Y=y=>SR.top+(y+pg._oy)*cam.s+cam.ty;selbar.hidden=false;const bw=selbar.offsetWidth,bh=selbar.offsetHeight;const x=clamp((X(r.x0)+X(r.x1))/2-bw/2,8,innerWidth-bw-8);let y=Y(r.y0)-bh-14;if(y<SR.top+6)y=Math.min(Y(r.y1)+20,SR.bottom-bh-70);selbar.style.left=x+'px';selbar.style.top=Math.max(SR.top+6,y)+'px'}
+function placeSelBar(){placeNoteBar();if(!sel||act||$('#editor').hidden){selbar.hidden=true;return}selbar.classList.toggle('area',selEmpty());const r=selRect(),X=x=>SR.left+x*cam.s+cam.tx,Y=y=>SR.top+(y+pg._oy)*cam.s+cam.ty;selbar.hidden=false;const bw=selbar.offsetWidth,bh=selbar.offsetHeight;const x=clamp((X(r.x0)+X(r.x1))/2-bw/2,8,innerWidth-bw-8);let y=Y(r.y0)-bh-14;if(y<SR.top+6)y=Math.min(Y(r.y1)+20,SR.bottom-bh-70);selbar.style.left=x+'px';selbar.style.top=Math.max(SR.top+6,y)+'px'}
 selbar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sel)return;const a=b.dataset.a;
  if(a==='done'){clearSel();return}
  if(a==='del'){pushUndo(snapshot());pg.strokes=pg.strokes.filter(s=>!sel.strokes.has(s));pg.images=pg.images.filter(i=>!sel.imgs.has(i));sel=null;render();markDirty();return}
+ if(a==='note'){createNoteFromSel();return}
  if(a==='shot'){doShot();return}
  if(a==='copy'){copySel();toast('已拷貝，單指點一下畫面選「貼上」');return}
  if(a==='cut'){copySel();pushUndo(snapshot());pg.strokes=pg.strokes.filter(s=>!sel.strokes.has(s));pg.images=pg.images.filter(i=>!sel.imgs.has(i));sel=null;render();markDirty();toast('已剪下，單指點一下畫面選「貼上」');return}
@@ -482,6 +490,36 @@ async function shotToClip(b){try{const key=uid();await DB.put('blobs',{type:'ima
 function doShot(){const p=shotBlob();p.then(shotToClip,()=>{});let tried=false;try{if(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem){tried=true;navigator.clipboard.write([new ClipboardItem({'image/png':p})]).then(()=>toast('已複製截圖：可以貼到 ChatGPT，也能在筆記上單指點一下選「貼上」'),async()=>{try{showShot(await p)}catch(e){toast('截圖失敗')}})}}catch(e){tried=false}if(!tried)p.then(showShot,()=>toast('截圖失敗'))}
 document.addEventListener('paste',async e=>{if($('#editor').hidden||!pg)return;const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));if(!it)return;e.preventDefault();const f=it.getAsFile();if(f)insertImageFile(f)});
 
+/* ---------- sticky notes ---------- */
+let openNote=null;
+const NSZ=[[340,240],[460,330],[620,450]];
+const noteOf=(p,id)=>(p.notes||[]).find(n=>n.id===id);
+function notePanel(p,n){const [w0,h0]=NSZ[n.sz||0],w=Math.min(w0,p.w-20),h=Math.min(h0,p.h-20),a=n.a;let x=a[2]+18;if(x+w>p.w-6){x=a[0]-18-w;if(x<6)x=clamp((a[0]+a[2])/2-w/2,6,p.w-w-6)}let y=x>=a[2]||x+w<=a[0]?a[1]-8:a[3]+18;if(y+h>p.h-6)y=x>=a[2]||x+w<=a[0]?p.h-h-6:a[1]-h-18;return {x,y:clamp(y,6,p.h-h-6),w,h}}
+function markerPos(n){return {x:n.a[2]+2,y:n.a[1]-2}}
+function drawMarkers(ctx,p,night){const ns=p.notes||[];if(!ns.length)return;ctx.save();for(const n of ns){const a=n.a,m=markerPos(n),op=openNote&&openNote.id===n.id;
+ ctx.strokeStyle=night?'rgba(255,214,80,.55)':'rgba(214,160,0,.6)';ctx.lineWidth=2;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(a[0],a[3]+3);ctx.lineTo(a[2],a[3]+3);ctx.stroke();ctx.setLineDash([]);
+ if(op){ctx.fillStyle=night?'rgba(255,214,80,.10)':'rgba(255,214,80,.16)';ctx.fillRect(a[0]-4,a[1]-4,a[2]-a[0]+8,a[3]-a[1]+8)}
+ const s=22;ctx.beginPath();ctx.moveTo(m.x,m.y-s);ctx.lineTo(m.x+s-7,m.y-s);ctx.lineTo(m.x+s,m.y-s+7);ctx.lineTo(m.x+s,m.y);ctx.lineTo(m.x,m.y);ctx.closePath();ctx.fillStyle=op?'#ffc400':'#ffdd55';ctx.fill();ctx.strokeStyle='rgba(120,90,0,.55)';ctx.lineWidth=1.2;ctx.stroke();
+ ctx.beginPath();ctx.moveTo(m.x+s-7,m.y-s);ctx.lineTo(m.x+s-7,m.y-s+7);ctx.lineTo(m.x+s,m.y-s+7);ctx.stroke();
+ ctx.strokeStyle='rgba(120,90,0,.6)';ctx.lineWidth=1.6;for(const yy of [m.y-12,m.y-6]){ctx.beginPath();ctx.moveTo(m.x+4,yy);ctx.lineTo(m.x+s-5,yy);ctx.stroke()}}ctx.restore()}
+function drawNotePanel(ctx,p,n,night,liveSt){const r=notePanel(p,n),k=1/cam.s;ctx.save();ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=14*dpr;ctx.shadowOffsetY=4*dpr;ctx.fillStyle=night?'#3b3622':'#fff6bf';ctx.fillRect(r.x,r.y,r.w,r.h);ctx.restore();
+ ctx.save();ctx.strokeStyle=night?'rgba(255,214,80,.45)':'rgba(200,150,0,.55)';ctx.lineWidth=1.2;ctx.strokeRect(r.x,r.y,r.w,r.h);
+ ctx.strokeStyle=night?'rgba(255,214,80,.35)':'rgba(214,160,0,.45)';ctx.setLineDash([4*k,4*k]);ctx.beginPath();const a=n.a,cx=(r.x>=a[2])?r.x:(r.x+r.w<=a[0]?r.x+r.w:(a[0]+a[2])/2),cy=(r.x>=a[2]||r.x+r.w<=a[0])?r.y+20:(r.y>a[3]?r.y:r.y+r.h);ctx.moveTo(a[2],a[1]);ctx.lineTo(cx,cy);ctx.stroke();ctx.setLineDash([]);
+ ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();ctx.translate(r.x,r.y);for(const st of n.strokes)drawStroke(ctx,st,night);if(liveSt)drawStroke(ctx,liveSt,night,true);ctx.restore()}
+function hitMarker(p,n,ex,ey){const m=markerPos(n),X=x=>x*cam.s+cam.tx,Y=y=>(y+p._oy)*cam.s+cam.ty;return Math.hypot(ex-X(m.x+11),ey-Y(m.y-11))<Math.max(24,14*cam.s)}
+function noteHit(e,anchorToo){if(!pg)return null;const ex=e.clientX-SR.left,ey=e.clientY-SR.top;for(const p of visPages())for(const n of p.notes||[]){if(hitMarker(p,n,ex,ey))return {p,n};if(anchorToo){const a=n.a,X=x=>x*cam.s+cam.tx,Y=y=>(y+p._oy)*cam.s+cam.ty;if(ex>=X(a[0])&&ex<=X(a[2])&&ey>=Y(a[1])&&ey<=Y(a[3]))return {p,n}}}return null}
+function inOpenPanel(q){if(!openNote||openNote.p!==pg)return null;const n=noteOf(pg,openNote.id);if(!n){openNote=null;return null}const r=notePanel(pg,n);return q.x>=r.x&&q.x<=r.x+r.w&&q.y>=r.y&&q.y<=r.y+r.h?{n,r}:null}
+function toggleNote(p,n){if(openNote&&openNote.id===n.id)openNote=null;else{openNote={p,id:n.id};if(p!==pg){pg=p;cur=pages.indexOf(p);syncUI()}}dropCache(p);render()}
+function closeNote(){if(!openNote)return;const p=openNote.p;openNote=null;dropCache(p);render()}
+function replaceNote(n){pg.notes=(pg.notes||[]).map(x=>x.id===n.id?n:x)}
+const notebar=$('#notebar');
+function placeNoteBar(){if(!openNote||act||$('#editor').hidden||!visPages().includes(openNote.p)){notebar.hidden=true;return}const p=openNote.p,n=noteOf(p,openNote.id);if(!n){notebar.hidden=true;return}const r=notePanel(p,n),X=x=>SR.left+x*cam.s+cam.tx,Y=y=>SR.top+(y+p._oy)*cam.s+cam.ty;notebar.hidden=false;const bw=notebar.offsetWidth,bh=notebar.offsetHeight;notebar.style.left=clamp(X(r.x+r.w)-bw,8,innerWidth-bw-8)+'px';let y=Y(r.y)-bh-8;if(y<SR.top+6)y=Y(r.y+r.h)+8;notebar.style.top=clamp(y,SR.top+6,SR.bottom-bh-70)+'px'}
+notebar.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||!openNote)return;const p=openNote.p,n=noteOf(p,openNote.id);if(!n)return;const a=b.dataset.a;
+ if(a==='close'){closeNote();return}
+ if(a==='size'){pg=p;pushUndo(snapshot());replaceNote({...n,sz:((n.sz||0)+1)%3});markDirty(p);render();return}
+ if(a==='del'){if(n.strokes.length&&!await modal({title:'刪除這張便條？',text:'便條裡寫的內容也會一起刪除。可以用復原找回。',ok:'刪除',danger:true}))return;pg=p;pushUndo(snapshot());p.notes=p.notes.filter(x=>x.id!==n.id);openNote=null;markDirty(p);dropCache(p);render()}});
+function createNoteFromSel(){if(!sel)return;const r=selRect();pushUndo(snapshot());const n={id:uid(),a:[r2(r.x0),r2(r.y0),r2(r.x1),r2(r.y1)],sz:0,strokes:[]};pg.notes=[...(pg.notes||[]),n];sel=null;openNote={p:pg,id:n.id};if(S.tool==='lasso'||S.tool==='eraser')setTool('pen');markDirty();dropCache(pg);render();toast('在黃色便條裡寫下說明，點便條圖示可以收合或展開')}
+
 /* ---------- input ---------- */
 let quickClosedAt=-1e9;
 const T=new Map(),ignored=new Set();let gest=null,penDown=false,penUpAt=0;
@@ -496,10 +534,11 @@ function moveTouch(e){const t=T.get(e.pointerId);t.x=e.clientX;t.y=e.clientY;con
  if(!gest.moved){if(Math.hypot(c.x-r.c.x,c.y-r.c.y)<10&&Math.abs(d-r.d)<10)return;gest.moved=true;closePop()}
  const s=pts.length>1&&r.d>0?clampS(r.cam.s*d/r.d):r.cam.s,k=s/r.cam.s;
  cam.s=s;cam.tx=(c.x-SR.left)-((r.c.x-SR.left)-r.cam.tx)*k;cam.ty=(c.y-SR.top)-((r.c.y-SR.top)-r.cam.ty)*k;clampCam();const tn=now();gest.hist.push({t:tn,x:cam.tx,y:cam.ty,n:pts.length});while(gest.hist.length>2&&tn-gest.hist[0].t>90)gest.hist.shift();updateCur();frame()}
-function endTouch(id){T.delete(id);if(!gest)return;if(T.size){gRef();return}const g=gest;gest=null;if(!g.moved&&now()-g.t0<320){if(g.maxN===2)undo();else if(g.maxN===3)redo();else if(g.maxN===1&&S.pencilOnly&&S.quick&&g.t0-quickClosedAt>150)showQuick(g.x,g.y)}
+function endTouch(id){T.delete(id);if(!gest)return;if(T.size){gRef();return}const g=gest;gest=null;if(!g.moved&&now()-g.t0<320){if(g.maxN===2)undo();else if(g.maxN===3)redo();else if(g.maxN===1&&S.pencilOnly){const nh=noteHit({clientX:g.x,clientY:g.y},true);if(nh)toggleNote(nh.p,nh.n);else if(S.quick&&g.t0-quickClosedAt>150)showQuick(g.x,g.y)}}
  if(g.moved&&g.hist.length>1){const h=g.hist,a=h[0],b=h[h.length-1],dt=now()-a.t;if(dt>0&&dt<140&&b.n===1){const vx=(b.x-a.x)/dt,vy=(b.y-a.y)/dt;if(Math.hypot(vx,vy)>0.25){startInertia(vx,vy);return}}}commitCam()}
 function startAct(e){try{stage.setPointerCapture(e.pointerId)}catch(_){}stopInertia();focusAt(e.clientY);const q=toPage(e);
  act={id:e.pointerId,pointer:e.pointerType,t0:now(),snap:snapshot(),cx:e.clientX,cy:e.clientY};closePop();
+ const np=inOpenPanel(q);if(np){if(sel){sel=null;render()}act.note=np.n.id;const lq2={x:q.x-np.r.x,y:q.y-np.r.y};if(S.tool==='lasso'){act.kind='none';return}if(S.tool==='eraser'){act.kind='erase';act.last=lq2;act.changed=false;cursor=null;eraseNote(lq2,lq2);return}const hl=S.tool==='hl',cfg=hl?S.hl:S.pen,pp=prs(e);act.kind='draw';act.st={t:hl?'hl':'pen',c:cfg.c,s:cfg.s,p:[r2(lq2.x),r2(lq2.y),r2(pp)]};if(!hl){act.st.k=S.pen.k||'fp';act.st.o={th:S.pen.th,sl:S.pen.sl,sm:0.5,ts:S.pen.tp||0,te:S.pen.tp||0,sp:e.pointerType!=='pen'}}act.sp=pp;drawLive();return}
  if(S.tool==='lasso'){const h=hitSel(e);if(h==='handle'){act.kind='scale';act.k0=sel.sc;act.A={x:sel.ax+sel.dx,y:sel.ay+sel.dy};act.d0=Math.max(1,Math.hypot(q.x-act.A.x,q.y-act.A.y))}else if(h==='inside'){act.kind='move';act.q0=q;act.d={x:sel.dx,y:sel.dy}}else{if(sel){sel=null;render()}act.kind='lasso';act.path=[q.x,q.y]}placeSelBar();drawLive();return}
  if(sel){sel=null;render()}
  if(S.tool==='eraser'){act.kind='erase';act.last=q;act.changed=false;cursor=q;eraseAt(q,q);liveQ();return}
@@ -507,7 +546,7 @@ function startAct(e){try{stage.setPointerCapture(e.pointerId)}catch(_){}stopIner
 function addPt(q,p){const st=act.st,a=st.p,n=a.length;if(st.k){if(Math.hypot(q.x-a[n-3],q.y-a[n-2])*cam.s<0.6)return;a.push(r2(q.x),r2(q.y),r2(p));act.sp=p;liveQ();return}act.sx+=(q.x-act.sx)*0.55;act.sy+=(q.y-act.sy)*0.55;act.sp+=(p-act.sp)*0.45;if(Math.hypot(act.sx-a[n-3],act.sy-a[n-2])*cam.s<0.8)return;a.push(r2(act.sx),r2(act.sy),r2(act.sp));
  if(st.t==='pen'){setCam(lx,pg);lx.fillStyle=nc(st.c,S.night);lx.beginPath();penPath(lx,a,st.s,a.length/3-1);lx.fill('nonzero')}else liveQ()}
 function moveAct(e){const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];const list=evs.length?evs:[e];act.cx=e.clientX;act.cy=e.clientY;
- for(const ev of list){const q=toPage(ev);
+ for(const ev of list){let q=toPage(ev);if(act.note){const n=noteOf(pg,act.note);if(!n)break;const r=notePanel(pg,n);q={x:q.x-r.x,y:q.y-r.y};if(act.kind==='draw'){addPt(q,prs(ev));continue}if(act.kind==='erase'){eraseNote(act.last,q);act.last=q;continue}continue}
   if(act.kind==='draw')addPt(q,prs(ev));
   else if(act.kind==='erase'){eraseAt(act.last,q);act.last=q;cursor=q}
   else if(act.kind==='lasso'){const p=act.path,n=p.length;if(Math.hypot(q.x-p[n-2],q.y-p[n-1])*cam.s>2)p.push(q.x,q.y)}
@@ -515,24 +554,25 @@ function moveAct(e){const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[]
   else if(act.kind==='scale'){sel.sc=Math.max(0.05,act.k0*Math.hypot(q.x-act.A.x,q.y-act.A.y)/act.d0)}}
  if(act.kind!=='draw')liveQ()}
 function endAct(e){const a=act;act=null;clearTimeout(a.lpT);
+ if(a.note){const n=noteOf(pg,a.note);if(n&&a.kind==='draw'){const st=a.st;st.b=bboxOf(st);pushUndo(a.snap);replaceNote({...n,strokes:[...n.strokes,st]});markDirty()}else if(a.kind==='erase'&&a.changed){pushUndo(a.snap);markDirty()}render();return}
  if(a.kind==='draw'){const q=toPage(e),st=a.st,p=st.p;if(e.type!=='pointercancel'&&Math.hypot(q.x-p[p.length-3],q.y-p[p.length-2])*cam.s>0.5)p.push(r2(q.x),r2(q.y),r2(a.sp));st.b=bboxOf(st);pushUndo(a.snap);pg.strokes.push(st);const ok=cacheOk(pg);markDirty();if(ok){const c=pg._cache,g=c.canvas.getContext('2d');g.setTransform(c.canvas.width/pg.w,0,0,c.canvas.height/pg.h,0,0);g.save();g.beginPath();g.rect(0,0,pg.w,pg.h);g.clip();drawStroke(g,st,c.night);g.restore();c.ver=pg._ver}render();return}
  if(a.kind==='erase'){if(a.changed){pushUndo(a.snap);markDirty()}if(a.pointer!=='pen')cursor=null;render();return}
  if(a.kind==='lasso'){finishLasso(a.path);drawLive();placeSelBar();return}
  if(a.kind==='move'||a.kind==='scale'){applySel(a.snap);placeSelBar()}}
-function cancelAct(){const a=act;if(!a)return;act=null;clearTimeout(a.lpT);pg.strokes=a.snap.strokes;pg.images=a.snap.images;if(sel){sel.dx=0;sel.dy=0;sel.sc=1}cursor=null;render()}
+function cancelAct(){const a=act;if(!a)return;act=null;clearTimeout(a.lpT);pg.strokes=a.snap.strokes;pg.images=a.snap.images;if(a.snap.notes)pg.notes=a.snap.notes;if(sel){sel.dx=0;sel.dy=0;sel.sc=1}cursor=null;render()}
 const isFloat=t=>t.closest&&t.closest('.float');
 stage.addEventListener('pointerdown',e=>{if(!pg||isFloat(e.target))return;SR=stage.getBoundingClientRect();const id=e.pointerId;
  if(e.pointerType==='pen'){stopInertia();
   if(!S.pencilOnly&&S.pencilAuto){S.pencilOnly=true;saveS();toast('偵測到 Apple Pencil，已開啟防手掌誤觸')}
   if(gest){if(now()-gest.t0<1500)cam={...gest.cam0};gest=null;for(const k of T.keys())ignored.add(k);T.clear();commitCam()}
-  if(act)cancelAct();penDown=true;startAct(e);return}
+  if(act)cancelAct();penDown=true;const nh=noteHit(e,false);if(nh){toggleNote(nh.p,nh.n);return}startAct(e);return}
  if(e.pointerType==='touch'){
   if(penDown||now()-penUpAt<350||(e.width>140&&e.height>140)){ignored.add(id);return}
   if(act&&act.pointer==='touch'){const a=act;cancelAct();addTouch(a.id,a.cx,a.cy);addTouch(id,e.clientX,e.clientY);return}
   if(act){ignored.add(id);return}
-  if(!T.size&&!gest){if(S.pencilOnly){if(S.tool==='lasso'&&hitSel(e)){startAct(e);return}}else{startAct(e);return}}
+  if(!T.size&&!gest){if(S.pencilOnly){if(S.tool==='lasso'&&hitSel(e)){startAct(e);return}}else{const nh=noteHit(e,false);if(nh){toggleNote(nh.p,nh.n);ignored.add(id);return}startAct(e);return}}
   addTouch(id,e.clientX,e.clientY);return}
- if(e.button!==0||act)return;startAct(e)});
+ if(e.button!==0||act)return;{const nh=noteHit(e,false);if(nh){toggleNote(nh.p,nh.n);return}}startAct(e)});
 stage.addEventListener('pointermove',e=>{const id=e.pointerId;if(ignored.has(id))return;
  if(act&&act.id===id){moveAct(e);return}
  if(T.has(id)&&gest){moveTouch(e);return}
@@ -621,7 +661,7 @@ const fsSync=()=>{$('#bFs use').setAttribute('href',fsEl()?'#i-fsx':'#i-fs');set
 document.addEventListener('fullscreenchange',fsSync);document.addEventListener('webkitfullscreenchange',fsSync);
 
 /* ---------- pages ---------- */
-function goPage(i,refit){if(!pages.length)return;i=clamp(i,0,pages.length-1);stopInertia();if(act)cancelAct();sel=null;T.clear();gest=null;cursor=null;if(pg&&dirty.has(pg))flush();pg=pages[i];cur=i;nb.last=i;layout();if(vMode()&&!refit&&SW){cam.ty=14-pg._oy*cam.s;clampCam()}else fit();render();syncUI();if(!$('#drawer').hidden)renderDrawer()}
+function goPage(i,refit){if(!pages.length)return;openNote=null;i=clamp(i,0,pages.length-1);stopInertia();if(act)cancelAct();sel=null;T.clear();gest=null;cursor=null;if(pg&&dirty.has(pg))flush();pg=pages[i];cur=i;nb.last=i;layout();if(vMode()&&!refit&&SW){cam.ty=14-pg._oy*cam.s;clampCam()}else fit();render();syncUI();if(!$('#drawer').hidden)renderDrawer()}
 async function addPage(after){const ref=pages[after];const p=newPage(ref&&!ref.bg?ref.paper:S.paper);pages.splice(after+1,0,p);markDirty(p);await flush();goPage(after+1);toast(`已新增第 ${after+2} 頁`)}
 async function delPage(i){
  if(pages.length===1){if(await modal({title:'清空這一頁？',text:'這是最後一頁，會清除所有筆跡和圖片。',ok:'清空',danger:true})){pushUndo(snapshot());pg.strokes=[];pg.images=[];render();markDirty()}return}
@@ -776,7 +816,7 @@ $('#grid').onclick=e=>{const card=e.target.closest('.nb');if(!card)return;const 
  else{if(!await modal({title:`刪除「${n.name}」？`,text:'筆記本裡的所有頁面都會被刪除，無法復原。',ok:'刪除',danger:true}))return;const recs=await DB.pagesOf(id);for(const r of recs){for(const k of keysOf(r))await DB.del('blobs',k);await DB.del('pages',r.id)}await DB.del('nbs',id);renderHome()}}})}};
 async function openNb(id){const n=await DB.get('nbs',id);if(!n){toast('找不到這本筆記本');return}nb=n;nb.pageIds=nb.pageIds||[];const recs=await DB.pagesOf(id),m=new Map(recs.map(r=>[r.id,r]));pages=nb.pageIds.map(i=>m.get(i)).filter(Boolean).map(deser);if(!pages.length){const p=newPage();pages=[p];markDirty(p)}
  $('#home').hidden=true;$('#editor').hidden=false;$('#drawer').hidden=true;$('#bTitle').textContent=nb.name;pg=null;cur=0;syncUI();await new Promise(r=>requestAnimationFrame(r));resize();goPage(nb.last||0,true)}
-async function showHome(){closePop();stopInertia();if(act)cancelAct();sel=null;HU=[];HR=[];for(const p of pages)dropCache(p);await flush();pg=null;nb=null;pages=[];evictExcept(new Set());selbar.hidden=true;$('#drawer').hidden=true;$('#editor').hidden=true;$('#home').hidden=false;renderHome()}
+async function showHome(){closePop();openNote=null;notebar.hidden=true;stopInertia();if(act)cancelAct();sel=null;HU=[];HR=[];for(const p of pages)dropCache(p);await flush();pg=null;nb=null;pages=[];evictExcept(new Set());selbar.hidden=true;$('#drawer').hidden=true;$('#editor').hidden=true;$('#home').hidden=false;renderHome()}
 $('#hNew').onclick=async()=>{const list=await DB.all('nbs');const name=await modal({title:'新筆記本',input:`筆記本 ${list.length+1}`,ok:'建立',html:`<p style="margin:0">紙張：可在筆記本內的「⋯」更換</p>`});if(!name)return;nb={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0};const p=newPage();pages=[p];markDirty(p);await flush();openNb(nb.id)};
 $('#hPdf').onclick=()=>{pdfInto=false;$('#fPdf').click()};
 $('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><button class="mi" id="xSab"><span>匯入自由ノート／Saber 筆記<small>支援 .freenotes、.sba、.sbn2 檔，筆跡可以繼續編輯</small></span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{

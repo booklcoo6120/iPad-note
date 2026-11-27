@@ -249,7 +249,7 @@ input.tg:checked::after{transform:translateX(20px)}
 <input type="file" id="fImg" accept="image/*" hidden>
 <input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
 <input type="file" id="fBak" accept=".json,application/json" hidden>
-<input type="file" id="fSaber" accept=".sba,.sbn2,.sbn" hidden>
+<input type="file" id="fSaber" hidden>
 
 <script>
 {
@@ -558,7 +558,7 @@ function toolPop(anchor){const t=S.tool;
   const s=el.querySelector('#pS');s.oninput=()=>{S.er.s=+s.value;s.nextElementSibling.textContent=s.value;saveS()};
   el.querySelector('#pClr').onclick=async()=>{closePop();if(!pg.strokes.length&&!pg.images.length)return;if(await modal({title:'清除這一頁？',text:'會清除這一頁所有筆跡和圖片（PDF 底圖會保留）。可以用復原找回。',ok:'清除',danger:true})){pushUndo(snapshot());pg.strokes=[];pg.images=[];sel=null;render();markDirty()}}});return}
  const cfg=t==='pen'?S.pen:S.hl,cols=t==='pen'?PEN_C:HL_C;
- openPop(anchor,`<div class="ph">${t==='pen'?'鋼筆':'螢光筆'}</div><div class="cols">${cols.map(c=>`<button class="cdot ${c===cfg.c?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" id="pC" value="${cfg.c}"></label></div><label class="sl">粗細<input type="range" id="pS" min="${t==='pen'?0.5:6}" max="${t==='pen'?16:48}" step="${t==='pen'?0.5:1}" value="${cfg.s}"><output>${cfg.s}</output></label><canvas id="pPrev"></canvas>${t==='pen'?`<div class="seg" style="margin-top:10px" id="pK"><button data-k="fp" class="${S.pen.k!=='bp'?'on':''}">鋼筆（有筆壓）</button><button data-k="bp" class="${S.pen.k==='bp'?'on':''}">原子筆（粗細一致）</button></div><label class="sl" id="pThL" ${S.pen.k==='bp'?'hidden':''}>筆壓變化<input type="range" id="pTh" min="0" max="0.9" step="0.05" value="${S.pen.th}"><output>${Math.round(S.pen.th*100)}</output></label><label class="sl">平滑（防手抖）<input type="range" id="pSl" min="0" max="0.9" step="0.05" value="${S.pen.sl}"><output>${Math.round(S.pen.sl*100)}</output></label><label class="sl">頭尾變細<input type="range" id="pTp" min="0" max="60" step="5" value="${S.pen.tp||0}"><output>${S.pen.tp||0}</output></label>`:''}`,el=>{if(t==='pen'){el.querySelector('#pK').onclick=ev=>{const b=ev.target.closest('[data-k]');if(!b)return;S.pen.k=b.dataset.k;saveS();el.querySelectorAll('[data-k]').forEach(x=>x.classList.toggle('on',x===b));el.querySelector('#pThL').hidden=S.pen.k==='bp';drawPrev()};for(const [id,key,mul] of [['pTh','th',100],['pSl','sl',100],['pTp','tp',1]]){const r=el.querySelector('#'+id);r.oninput=()=>{S.pen[key]=+r.value;r.nextElementSibling.textContent=Math.round(r.value*mul);saveS();drawPrev()}}}
+ openPop(anchor,`<div class="ph">${t==='pen'?'鋼筆':'螢光筆'}</div><div class="cols">${cols.map(c=>`<button class="cdot ${c===cfg.c?'on':''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}<label class="cdot custom" aria-label="自訂顏色"><input type="color" id="pC" value="${cfg.c}"></label></div><label class="sl">粗細<input type="range" id="pS" min="${t==='pen'?0.5:6}" max="${t==='pen'?16:48}" step="${t==='pen'?0.5:1}" value="${cfg.s}"><output>${cfg.s}</output></label><canvas id="pPrev"></canvas>${t==='pen'?`<button class="mi" id="pFN" style="margin-top:8px;background:var(--accs);color:var(--acc);font-weight:600;justify-content:center"><span style="flex:none">套用「自由ノート風」筆觸</span></button><div class="seg" style="margin-top:10px" id="pK"><button data-k="fp" class="${S.pen.k!=='bp'?'on':''}">鋼筆（有筆壓）</button><button data-k="bp" class="${S.pen.k==='bp'?'on':''}">原子筆（粗細一致）</button></div><label class="sl" id="pThL" ${S.pen.k==='bp'?'hidden':''}>筆壓變化<input type="range" id="pTh" min="0" max="0.9" step="0.05" value="${S.pen.th}"><output>${Math.round(S.pen.th*100)}</output></label><label class="sl">平滑（防手抖）<input type="range" id="pSl" min="0" max="0.9" step="0.05" value="${S.pen.sl}"><output>${Math.round(S.pen.sl*100)}</output></label><label class="sl">頭尾變細<input type="range" id="pTp" min="0" max="60" step="5" value="${S.pen.tp||0}"><output>${S.pen.tp||0}</output></label>`:''}`,el=>{if(t==='pen'){el.querySelector('#pFN').onclick=()=>{Object.assign(S.pen,{k:'bp',s:2,sl:0.3,tp:0});saveS();closePop();toast('已套用自由ノート風筆觸：粗細一致、細線');syncUI()};el.querySelector('#pK').onclick=ev=>{const b=ev.target.closest('[data-k]');if(!b)return;S.pen.k=b.dataset.k;saveS();el.querySelectorAll('[data-k]').forEach(x=>x.classList.toggle('on',x===b));el.querySelector('#pThL').hidden=S.pen.k==='bp';drawPrev()};for(const [id,key,mul] of [['pTh','th',100],['pSl','sl',100],['pTp','tp',1]]){const r=el.querySelector('#'+id);r.oninput=()=>{S.pen[key]=+r.value;r.nextElementSibling.textContent=Math.round(r.value*mul);saveS();drawPrev()}}}
   el.querySelector('.cols').onclick=ev=>{const d=ev.target.closest('[data-c]');if(!d)return;cfg.c=d.dataset.c;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.toggle('on',x===d));syncUI();drawPrev()};
   el.querySelector('#pC').oninput=ev=>{cfg.c=ev.target.value;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.remove('on'));syncUI();drawPrev()};
   const s=el.querySelector('#pS');s.oninput=()=>{cfg.s=+s.value;s.nextElementSibling.textContent=s.value;saveS();drawPrev()};drawPrev()})}
@@ -675,8 +675,12 @@ function parseBson(buf){const dv=new DataView(buf),u8=new Uint8Array(buf),td=new
   if(arr)o.push(v);else o[k]=v}return o};
  return doc(0,false)}
 async function readZip(buf){const dv=new DataView(buf),u8=new Uint8Array(buf);let e=-1;for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}if(e<0)throw new Error('不是有效的壓縮檔');
- const n=dv.getUint16(e+10,true);let q=dv.getUint32(e+16,true);const files={},td=new TextDecoder();
- for(let k=0;k<n;k++){const method=dv.getUint16(q+10,true),cs=dv.getUint32(q+20,true),nl=dv.getUint16(q+28,true),xl=dv.getUint16(q+30,true),cl=dv.getUint16(q+32,true),lho=dv.getUint32(q+42,true);const name=td.decode(u8.subarray(q+46,q+46+nl));q+=46+nl+xl+cl;const st=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);files[name]={method,data:u8.subarray(st,st+cs)}}
+ const big=o=>Number(dv.getBigUint64(o,true));let n=dv.getUint16(e+10,true),q=dv.getUint32(e+16,true);
+ if((n===0xFFFF||q===0xFFFFFFFF)&&e>=20&&dv.getUint32(e-20,true)===0x07064b50){const z=big(e-12);if(dv.getUint32(z,true)===0x06064b50){n=big(z+32);q=big(z+48)}}
+ const files={},td=new TextDecoder();
+ for(let k=0;k<n;k++){const method=dv.getUint16(q+10,true),nl=dv.getUint16(q+28,true),xl=dv.getUint16(q+30,true),cl=dv.getUint16(q+32,true);let cs=dv.getUint32(q+20,true),us=dv.getUint32(q+24,true),lho=dv.getUint32(q+42,true);const name=td.decode(u8.subarray(q+46,q+46+nl));
+  let x=q+46+nl;const xe=x+xl;while(x+4<=xe){const id=dv.getUint16(x,true),sz=dv.getUint16(x+2,true);if(id===1){let o=x+4;if(us===0xFFFFFFFF){us=big(o);o+=8}if(cs===0xFFFFFFFF){cs=big(o);o+=8}if(lho===0xFFFFFFFF){lho=big(o);o+=8}}x+=4+sz}
+  q=xe+cl;const st=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);files[name]={method,data:u8.subarray(st,st+cs)}}
  return {names:Object.keys(files),async get(name){const f=files[name];if(!f)return null;if(f.method===0)return f.data.slice();if(f.method===8){if(typeof DecompressionStream==='undefined')throw new Error('這個瀏覽器不支援解壓縮，請更新 iPadOS');const out=await new Response(new Blob([f.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();return new Uint8Array(out)}throw new Error('不支援的壓縮方式')}}}
 const argbHex=c=>{if(c==null)return '#000000';c=Number(c)>>>0;return '#'+(c&0xFFFFFF).toString(16).padStart(6,'0')};
 function saberStroke(j,k){const ty=j.ty||'fountainPen',pts=[],ox=j.ox||0,oy=j.oy||0;let hasP=false;
@@ -687,8 +691,8 @@ function saberStroke(j,k){const ty=j.ty||'fountainPen',pts=[],ox=j.ox||0,oy=j.oy
  if(ty==='Highlighter'){const st={t:'hl',c:argbHex(j.c),s:r2(size),p:pts};st.b=bboxOf(st);return st}
  if(ty==='Eraser'||ty==='LaserPointer')return null;
  const shape=ty==='ShapePen'||!!j.shape;const st={t:'pen',c:argbHex(j.c),s:r2(Math.max(0.3,size)),p:pts,k:(ty==='ballpointPen'||shape)?'bp':'fp',o:{th:j.t??0.5,sm:shape?0:(j.sm??0),sl:shape?0:(j.sl??0.5),sp:j.sp??!hasP,ts:j.ts>0?j.ts*k:0,te:j.te>0?j.te*k:0}};st.b=bboxOf(st);return st}
-async function importSaber(file){busy('正在匯入 Saber 筆記…',0.05);try{
- const buf=await file.arrayBuffer(),head=new Uint8Array(buf,0,Math.min(4,buf.byteLength));let main,getAsset=async()=>null;const name=file.name.replace(/\.(sba|sbn2|sbn)$/i,'')||'Saber 筆記';
+async function importSaber(file,pre){busy('正在匯入 Saber 筆記…',0.05);try{
+ const buf=pre||await file.arrayBuffer(),head=new Uint8Array(buf,0,Math.min(4,buf.byteLength));let main,getAsset=async()=>null;const name=file.name.replace(/\.(sba|sbn2|sbn)$/i,'')||'Saber 筆記';
  const toAB=u=>u.buffer.slice(u.byteOffset,u.byteOffset+u.byteLength);
  if(head[0]===0x50&&head[1]===0x4b){const z=await readZip(buf);const mn=z.names.find(n=>/\.sbn2$/i.test(n))||z.names.find(n=>/\.sbn$/i.test(n));if(!mn)throw new Error('壓縮檔裡找不到 Saber 筆記');const mb=await z.get(mn);main=/\.sbn$/i.test(mn)?JSON.parse(new TextDecoder().decode(mb)):parseBson(toAB(mb));getAsset=i=>z.get(mn+'.'+i)}
  else if(head[0]===0x7b)main=JSON.parse(new TextDecoder().decode(buf));else main=parseBson(buf);
@@ -711,7 +715,42 @@ async function importSaber(file){busy('正在匯入 Saber 筆記…',0.05);try{
  nbo.pageIds=made;const first=await DB.get('pages',made[0]);nbo.cover=first&&first.thumb;await DB.put('nbs',nbo);busy(null);evictExcept(new Set());
  toast(`已匯入 ${made.length} 頁`+(skipped?`（有 ${skipped} 個項目無法匯入）`:'')+((pj.some(x=>x&&x.q&&x.q.length>1))?'；文字方塊目前不支援':''));openNb(nbo.id)
  }catch(e){busy(null);toast('匯入失敗：'+(e&&e.message||e))}}
-$('#fSaber').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importSaber(f)};
+
+/* ---------- Freenotes import ---------- */
+function pbParse(u8){const out=[],dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);let i=0;const vi=()=>{let r=0,m=1,c;do{c=u8[i++];r+=(c&0x7f)*m;m*=128}while(c&0x80&&i<u8.length);return r};
+ while(i<u8.length){const key=vi(),f=Math.floor(key/8),t=key%8;let v;if(t===0)v=vi();else if(t===1){v=dv.getFloat64(i,true);i+=8}else if(t===5){v=dv.getFloat32(i,true);i+=4}else if(t===2){const l=vi();v=u8.subarray(i,i+l);i+=l}else throw new Error('無法解析的資料');out.push([f,v])}return out}
+const pbMap=u8=>{const m={};if(u8)for(const [f,v] of pbParse(u8))(m[f]||(m[f]=[])).push(v);return m};
+const pbStr=u=>u?new TextDecoder().decode(u):'';
+function fnTf(u){if(!u)return [1,0,0,1,0,0];const m=pbMap(u),g=(k,d)=>m[k]?m[k][0]:d;return [g(1,1),g(2,0),g(3,0),g(4,1),g(5,0),g(6,0)]}
+function fnPath(u,T){const out=[];const m=pbMap(u);for(const pt of m[2]||[]){const q=pbMap(pt),xy=pbMap(q[1]&&q[1][0]),sz=pbMap(q[3]&&q[3][0]);const x=xy[1]?xy[1][0]:0,y=xy[2]?xy[2][0]:0;out.push([T[0]*x+T[2]*y+T[4],T[1]*x+T[3]*y+T[5],sz[1]?sz[1][0]:2])}return out}
+function fnErase(pts,ers){if(!ers.length)return [pts];const d=[];for(let i=0;i<pts.length;i++){if(i){const a=pts[i-1],b=pts[i],n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/0.6);for(let k=1;k<n;k++){const t=k/n;d.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]])}}d.push(pts[i])}
+ const segs=[];for(const e of ers)for(let i=0;i<e.length;i++){const a=e[Math.max(0,i-1)],b=e[i];segs.push([a[0],a[1],b[0],b[1],(b[2]||8)/2])}
+ const runs=[];let run=[];for(const p of d){let gone=false;for(const g of segs)if(segD(p[0],p[1],g[0],g[1],g[2],g[3])<g[4]){gone=true;break}if(gone){if(run.length>1)runs.push(run);run=[]}else run.push(p)}if(run.length>1)runs.push(run);return runs}
+const FNW=0.55;
+async function importFreenotes(z){busy('正在匯入自由ノート筆記…',0.05);try{
+ const docN=z.names.find(n=>/\.frnote\/document\.dat$/.test(n));const root=docN.slice(0,-'document.dat'.length),get=n=>z.get(root+n);
+ const doc=pbMap(await get('document.dat')),lay=pbMap(await get('layout.dat')),meta=pbMap(await get('metadata.dat'));
+ const name=pbStr(meta[3]&&meta[3][0])||pbStr(meta[4]&&meta[4][0])||'自由ノート';
+ const list=(pbMap(doc[4]&&doc[4][0])[1]||[]).map(u=>{const m=pbMap(u);return {id:pbStr(m[1]&&m[1][0]),idx:m[3]?m[3][0]:0,file:pbStr(m[6]&&m[6][0])}});
+ const L={};for(const u of lay[3]||[]){const m=pbMap(u),sz=pbMap(m[1]&&m[1][0]),off=pbMap(m[3]&&m[3][0]);L[pbStr(m[5]&&m[5][0])]={w:sz[1]?sz[1][0]:595,h:sz[2]?sz[2][0]:842,oy:off[2]?off[2][0]:0}}
+ let acc=0;const pgs=list.sort((a,b)=>a.idx-b.idx).map(p=>{const l=L[p.id]||{w:595,h:842,oy:acc};acc=l.oy+l.h;return {...p,...l,strokes:[]}});
+ if(!pgs.length)throw new Error('這份筆記沒有任何頁面');pgs.sort((a,b)=>a.oy-b.oy);
+ const byFile={};for(const p of pgs)byFile[p.file]=p;let skipped=0,count=0,skippedOut=0;
+ for(let i=0;i<pgs.length;i++){busy(`正在讀取第 ${i+1} / ${pgs.length} 頁…`,i/pgs.length*0.8);const P=pgs[i];const raw=await get('FNPages/'+P.file+'.dat');if(!raw)continue;const pm=pbMap(raw);
+  for(const ob of pm[3]||[]){try{const o=pbMap(ob),o2=pbMap(o[2]&&o[2][0]);if(!o2[1]){skipped++;continue}const sm=pbMap(o2[1][0]),sty=pbMap(sm[2]&&sm[2][0]),type=sty[1]?sty[1][0]:1,col=sty[2]?sty[2][0]:255;
+   if(type!==1&&type!==2){skipped++;continue}const pts=fnPath(sm[4]&&sm[4][0],fnTf(sm[3]&&sm[3][0]));if(!pts.length)continue;
+   const ers=(sm[5]||[]).map(e=>{const em=pbMap(e);return fnPath(em[4]&&em[4][0],fnTf(em[3]&&em[3][0]))});
+   for(const run of fnErase(pts,ers)){const mid=run[Math.floor(run.length/2)],gy=P.oy+mid[1];if(gy<pgs[0].oy-14||gy>pgs[pgs.length-1].oy+pgs[pgs.length-1].h+14){skippedOut++;continue}let T=P;for(const q of pgs)if(gy>=q.oy-14)T=q;T.strokes.push({type,col,w:run[0][2],pts:run.map(p=>[p[0],P.oy+p[1]])});count++}}catch(e){skipped++}}}
+ const nbo={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0},hex=c=>'#'+(Math.floor(c/256)%16777216).toString(16).padStart(6,'0');
+ for(let i=0;i<pgs.length;i++){busy(`正在建立第 ${i+1} / ${pgs.length} 頁…`,0.8+i/pgs.length*0.2);const P=pgs[i],k=1000/P.w;const page={id:uid(),nb:nbo.id,w:1000,h:Math.round(P.h*k),paper:'blank',bg:null,strokes:[],images:[],thumb:null};
+  for(const r of P.strokes){const p=[];for(const q of r.pts)p.push(r2(q[0]*k),r2((q[1]-P.oy)*k),0.5);const st=r.type===2?{t:'hl',c:hex(r.col),s:r2(Math.max(2,r.w*k*FNW)),p}:{t:'pen',c:hex(r.col),s:r2(Math.max(0.3,r.w*k*FNW)),p,k:'bp',o:{th:0,sm:0.5,sl:0.2}};st.b=bboxOf(st);page.strokes.push(st)}
+  page.thumb=makeThumb(page);await DB.put('pages',ser(page));nbo.pageIds.push(page.id)}
+ const first=await DB.get('pages',nbo.pageIds[0]);nbo.cover=first&&first.thumb;await DB.put('nbs',nbo);busy(null);
+ const extra=z.names.some(n=>n.startsWith(root+'PDFs/')&&!n.endsWith('.dat')&&!n.endsWith('/'))||z.names.some(n=>/\/(Images|Objects\/Images)\/[^/]+$/.test(n));
+ toast(`已匯入 ${pgs.length} 頁、${count} 筆筆跡`+(skipped?`（${skipped} 個項目無法匯入）`:'')+(extra?'；PDF 和圖片目前還不支援':''));openNb(nbo.id)
+ }catch(e){busy(null);toast('匯入失敗：'+(e&&e.message||e))}}
+async function importOther(file){try{const buf=await file.arrayBuffer(),h=new Uint8Array(buf,0,Math.min(4,buf.byteLength));if(h[0]===0x50&&h[1]===0x4b){const z=await readZip(buf);if(z.names.some(n=>/\.frnote\/document\.dat$/.test(n)))return importFreenotes(z)}return importSaber(file,buf)}catch(e){busy(null);toast('匯入失敗：'+(e&&e.message||e))}}
+$('#fSaber').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importOther(f)};
 
 /* ---------- export ---------- */
 async function renderExport(c,p){const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);for(const k of keysOf(p))await loadImgP(k);const k=c.width/p.w;g.setTransform(k,0,0,k,0,0);drawContent(g,p,false,null,null)}
@@ -740,7 +779,7 @@ async function openNb(id){const n=await DB.get('nbs',id);if(!n){toast('找不到
 async function showHome(){closePop();stopInertia();if(act)cancelAct();sel=null;HU=[];HR=[];for(const p of pages)dropCache(p);await flush();pg=null;nb=null;pages=[];evictExcept(new Set());selbar.hidden=true;$('#drawer').hidden=true;$('#editor').hidden=true;$('#home').hidden=false;renderHome()}
 $('#hNew').onclick=async()=>{const list=await DB.all('nbs');const name=await modal({title:'新筆記本',input:`筆記本 ${list.length+1}`,ok:'建立',html:`<p style="margin:0">紙張：可在筆記本內的「⋯」更換</p>`});if(!name)return;nb={id:uid(),name,pageIds:[],created:Date.now(),updated:Date.now(),cover:null,last:0};const p=newPage();pages=[p];markDirty(p);await flush();openNb(nb.id)};
 $('#hPdf').onclick=()=>{pdfInto=false;$('#fPdf').click()};
-$('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><button class="mi" id="xSab"><span>匯入 Saber 筆記<small>支援 .sba、.sbn2、.sbn 檔，筆跡可以繼續編輯</small></span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{
+$('#hMore').onclick=e=>openPop(e.currentTarget,`<button class="mi" id="xBak"><span>備份全部筆記<small>匯出成一個 .json 檔，換裝置或清除資料前請先備份</small></span></button><button class="mi" id="xRes"><span>從備份還原</span></button><button class="mi" id="xSab"><span>匯入自由ノート／Saber 筆記<small>支援 .freenotes、.sba、.sbn2 檔，筆跡可以繼續編輯</small></span></button><div class="hr"></div><label class="mi"><span>夜間模式</span><input type="checkbox" class="tg" id="xNight" ${S.night?'checked':''}></label><p class="hint" id="xUse"></p>`,el=>{
  el.querySelector('#xBak').onclick=()=>{closePop();backup()};el.querySelector('#xRes').onclick=()=>{closePop();$('#fBak').click()};el.querySelector('#xSab').onclick=()=>{closePop();$('#fSaber').click()};
  el.querySelector('#xNight').onchange=ev=>{S.night=ev.target.checked;saveS();applyNight()};
  try{navigator.storage.estimate().then(u=>{const x=el.querySelector('#xUse');if(x)x.textContent=`目前使用 ${(u.usage/1048576).toFixed(1)} MB`})}catch(_){}});

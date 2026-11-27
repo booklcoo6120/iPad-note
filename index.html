@@ -260,6 +260,8 @@ input.tg:checked::after{transform:translateX(20px)}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const now=()=>performance.now();
+const LOG=[];function log(m){LOG.push([Date.now(),m]);if(LOG.length>80)LOG.shift()}
+const TOOLN={pen:'鋼筆',hl:'螢光筆',eraser:'橡皮擦',lasso:'套索'};
 const r2=v=>Math.round(v*100)/100;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -425,8 +427,8 @@ const snapshot=()=>({strokes:pg.strokes.slice(),images:pg.images.slice(),notes:(
 let HU=[],HR=[];
 function pushUndo(s){HU.push({p:pg,s});if(HU.length>200)HU.shift();HR.length=0;syncUndo()}
 function histStep(from,to){if(!pg||act)return;let e;while((e=from.pop())&&!pages.includes(e.p));if(!e)return syncUndo();const p=e.p;to.push({p,s:{strokes:p.strokes.slice(),images:p.images.slice(),notes:(p.notes||[]).slice()}});p.strokes=e.s.strokes;p.images=e.s.images;if(e.s.notes)p.notes=e.s.notes;dropCache(p);if(openNote&&openNote.p===p&&!noteOf(p,openNote.id))openNote=null;sel=null;if(p!==pg){pg=p;cur=pages.indexOf(p);if(vMode()){const top=(p._oy)*cam.s+cam.ty;if(top>SH*0.8||top+p.h*cam.s<SH*0.1){cam.ty=14-p._oy*cam.s;clampCam()}}else{goPage(cur)}}markDirty(p);render();syncUI()}
-function undo(){histStep(HU,HR)}
-function redo(){histStep(HR,HU)}
+function undo(src){log('復原（'+(typeof src==='string'?src:'按鈕')+'）');histStep(HU,HR)}
+function redo(src){log('重做（'+(typeof src==='string'?src:'按鈕')+'）');histStep(HR,HU)}
 function syncUndo(){$('#bUndo').disabled=!HU.length;$('#bRedo').disabled=!HR.length}
 
 /* ---------- geometry ---------- */
@@ -529,7 +531,7 @@ function createNoteFromSel(){if(!sel)return;const r=selRect();pushUndo(snapshot(
 
 /* ---------- input ---------- */
 let quickClosedAt=-1e9;
-const T=new Map(),ignored=new Set();let gest=null,penDown=false,penUpAt=0;
+const T=new Map(),ignored=new Set();let gest=null,penDown=false,penUpAt=-1e9;
 const toPage=e=>({x:(e.clientX-SR.left-cam.tx)/cam.s,y:(e.clientY-SR.top-cam.ty)/cam.s-(pg._oy||0)});
 const prs=e=>e.pointerType==='pen'?clamp(e.pressure||0.05,0.02,1):0.5;
 const cen=pts=>{let x=0,y=0;for(const p of pts){x+=p.x;y+=p.y}return {x:x/pts.length,y:y/pts.length}};
@@ -541,7 +543,7 @@ function moveTouch(e){const t=T.get(e.pointerId);t.x=e.clientX;t.y=e.clientY;con
  if(!gest.moved){if(Math.hypot(c.x-r.c.x,c.y-r.c.y)<10&&Math.abs(d-r.d)<10)return;gest.moved=true;closePop()}
  const s=pts.length>1&&r.d>0?clampS(r.cam.s*d/r.d):r.cam.s,k=s/r.cam.s;
  cam.s=s;cam.tx=(c.x-SR.left)-((r.c.x-SR.left)-r.cam.tx)*k;cam.ty=(c.y-SR.top)-((r.c.y-SR.top)-r.cam.ty)*k;clampCam();const tn=now();gest.hist.push({t:tn,x:cam.tx,y:cam.ty,n:pts.length});while(gest.hist.length>2&&tn-gest.hist[0].t>90)gest.hist.shift();updateCur();frame()}
-function endTouch(id){T.delete(id);if(!gest)return;if(T.size){gRef();return}const g=gest;gest=null;if(!g.moved&&now()-g.t0<320){if(g.maxN===2)undo();else if(g.maxN===3)redo();else if(g.maxN===1&&S.pencilOnly){const nh=noteHit({clientX:g.x,clientY:g.y},true);if(nh)toggleNote(nh.p,nh.n);else if(S.quick&&g.t0-quickClosedAt>150)showQuick(g.x,g.y)}}
+function endTouch(id){T.delete(id);if(!gest)return;if(T.size){gRef();return}const g=gest;gest=null;if(!g.moved&&now()-g.t0<320){const busyPen=penDown||g.t0-penUpAt<1500;if(busyPen&&g.maxN<=3){log('忽略手指點一下（'+g.maxN+' 指，剛寫完字，可能是手掌）')}else if(g.maxN===2)undo('雙指點一下');else if(g.maxN===3)redo('三指點一下');else if(g.maxN===1&&S.pencilOnly){const nh=noteHit({clientX:g.x,clientY:g.y},true);if(nh)toggleNote(nh.p,nh.n);else if(S.quick&&g.t0-quickClosedAt>150)showQuick(g.x,g.y)}}
  if(g.moved&&g.hist.length>1){const h=g.hist,a=h[0],b=h[h.length-1],dt=now()-a.t;if(dt>0&&dt<140&&b.n===1){const vx=(b.x-a.x)/dt,vy=(b.y-a.y)/dt;if(Math.hypot(vx,vy)>0.25){startInertia(vx,vy);return}}}commitCam()}
 function startAct(e){try{stage.setPointerCapture(e.pointerId)}catch(_){}stopInertia();focusAt(e.clientY);const q=toPage(e);
  act={id:e.pointerId,pointer:e.pointerType,t0:now(),snap:snapshot(),cx:e.clientX,cy:e.clientY};closePop();
@@ -568,11 +570,14 @@ function endAct(e){const a=act;act=null;clearTimeout(a.lpT);
  if(a.kind==='move'||a.kind==='scale'){applySel(a.snap);placeSelBar()}}
 function cancelAct(){const a=act;if(!a)return;act=null;clearTimeout(a.lpT);pg.strokes=a.snap.strokes;pg.images=a.snap.images;if(a.snap.notes)pg.notes=a.snap.notes;if(sel){sel.dx=0;sel.dy=0;sel.sc=1}cursor=null;render()}
 const isFloat=t=>t.closest&&t.closest('.float');
+let lastPtr='',blockClickUntil=0;const btnName=t=>{const b=t.closest&&t.closest('button');return b?(b.getAttribute('aria-label')||b.textContent.trim()||'按鈕'):'空白處'};
+document.addEventListener('pointerdown',e=>{lastPtr=e.pointerType==='pen'?'筆':e.pointerType==='touch'?'手指':'滑鼠';if(e.pointerType==='touch'&&S.pencilOnly&&e.target.closest&&e.target.closest('#tbar,.pill,#selbar,#notebar')&&(penDown||now()-penUpAt<900)){blockClickUntil=now()+800;log('擋下：寫字時手碰到「'+btnName(e.target)+'」')}},true);
+document.addEventListener('click',e=>{if(now()<blockClickUntil&&e.target.closest&&e.target.closest('#tbar,.pill,#selbar,#notebar')){e.stopPropagation();e.preventDefault();blockClickUntil=0}},true);
 stage.addEventListener('pointerdown',e=>{if(!pg||isFloat(e.target))return;SR=stage.getBoundingClientRect();const id=e.pointerId;
  if(e.pointerType==='pen'){stopInertia();
-  if(!S.pencilOnly&&S.pencilAuto){S.pencilOnly=true;saveS();toast('偵測到 Apple Pencil，已開啟防手掌誤觸')}
+  if(!S.pencilOnly&&S.pencilAuto){S.pencilOnly=true;saveS();toast('偵測到 Apple Pencil，已開啟防手掌誤觸');log('開啟防手掌誤觸')}
   if(gest){if(now()-gest.t0<1500)cam={...gest.cam0};gest=null;for(const k of T.keys())ignored.add(k);T.clear();commitCam()}
-  if(act)cancelAct();penDown=true;const nh=noteHit(e,false);if(nh){toggleNote(nh.p,nh.n);return}startAct(e);return}
+  if(act)cancelAct();penDown=true;const nh=noteHit(e,false);if(nh){log('筆點到便條圖示（展開／收合便條）');toggleNote(nh.p,nh.n);return}startAct(e);return}
  if(e.pointerType==='touch'){
   if(penDown||now()-penUpAt<350||(e.width>140&&e.height>140)){ignored.add(id);return}
   if(act&&act.pointer==='touch'){const a=act;cancelAct();addTouch(a.id,a.cx,a.cy);addTouch(id,e.clientX,e.clientY);return}
@@ -592,10 +597,10 @@ for(const ev of ['touchstart','touchmove'])stage.addEventListener(ev,e=>{if(!isF
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 stage.addEventListener('wheel',e=>{e.preventDefault();if(!pg||act)return;if(e.ctrlKey||e.metaKey){const s=clampS(cam.s*Math.exp(-e.deltaY*0.01)),mx=e.clientX-SR.left,my=e.clientY-SR.top;cam.tx=mx-(mx-cam.tx)*s/cam.s;cam.ty=my-(my-cam.ty)*s/cam.s;cam.s=s}else{cam.tx-=e.deltaX;cam.ty-=e.deltaY}stopInertia();clampCam();updateCur();frame()},{passive:false});
-document.addEventListener('keydown',e=>{if($('#editor').hidden||e.target.tagName==='INPUT')return;const k=e.key.toLowerCase();if((e.metaKey||e.ctrlKey)&&k==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if((e.metaKey||e.ctrlKey)&&k==='y'){e.preventDefault();redo()}else if((e.metaKey||e.ctrlKey)&&k==='c'&&sel&&!selEmpty()){e.preventDefault();copySel();toast('已拷貝')}else if((e.metaKey||e.ctrlKey)&&k==='x'&&sel&&!selEmpty()){e.preventDefault();selbar.querySelector('[data-a=cut]').click()}else if((e.metaKey||e.ctrlKey)&&k==='v'&&CLIP){e.preventDefault();pasteAt((SW/2-cam.tx)/cam.s,(SH/2-cam.ty)/cam.s-pg._oy)}else if((k==='backspace'||k==='delete')&&sel&&!selEmpty()){selbar.querySelector('[data-a=del]').click()}else if(k==='escape')clearSel()});
+document.addEventListener('keydown',e=>{if($('#editor').hidden||e.target.tagName==='INPUT')return;const k=e.key.toLowerCase();if((e.metaKey||e.ctrlKey)&&k==='z'){e.preventDefault();e.shiftKey?redo('鍵盤'):undo('鍵盤')}else if((e.metaKey||e.ctrlKey)&&k==='y'){e.preventDefault();redo('鍵盤')}else if((e.metaKey||e.ctrlKey)&&k==='c'&&sel&&!selEmpty()){e.preventDefault();copySel();toast('已拷貝')}else if((e.metaKey||e.ctrlKey)&&k==='x'&&sel&&!selEmpty()){e.preventDefault();selbar.querySelector('[data-a=cut]').click()}else if((e.metaKey||e.ctrlKey)&&k==='v'&&CLIP){e.preventDefault();pasteAt((SW/2-cam.tx)/cam.s,(SH/2-cam.ty)/cam.s-pg._oy)}else if((k==='backspace'||k==='delete')&&sel&&!selEmpty()){selbar.querySelector('[data-a=del]').click()}else if(k==='escape')clearSel()});
 
 /* ---------- tools ui ---------- */
-function setTool(t){if(sel&&t!=='lasso'){sel=null;render()}S.tool=t;cursor=null;saveS();syncUI();drawLive()}
+function setTool(t,src){if(S.tool!==t)log('切換成'+(TOOLN[t]||t)+'（'+(src||'程式')+'）');if(sel&&t!=='lasso'){sel=null;render()}S.tool=t;cursor=null;saveS();syncUI();drawLive()}
 function syncUI(){$$('.tool').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tool));const cfg=S.tool==='pen'?S.pen:S.tool==='hl'?S.hl:null,sw=$('#bSw');sw.classList.toggle('none',!cfg);if(cfg)sw.style.setProperty('--c',nc(cfg.c,S.night));$('#pnum').textContent=`${cur+1} / ${pages.length}`;$('#bPrev').disabled=cur<=0;$('#bNext').disabled=cur>=pages.length-1;syncUndo()}
 function drawPrev(){const c=$('#pPrev');if(!c)return;const t=S.tool,cfg=t==='hl'?S.hl:S.pen,W=c.clientWidth||270,H=c.clientHeight||44,d=Math.min(2,devicePixelRatio||1);c.width=W*d;c.height=H*d;const g=c.getContext('2d');g.scale(d,d);const p=[];for(let i=0;i<=60;i++){const x=16+(W-32)*i/60;p.push(x,H/2+Math.sin(i/60*Math.PI*2)*H*0.22,t==='hl'?0.5:0.15+0.7*Math.sin(i/60*Math.PI))}g.fillStyle=paperCol(S.night);g.fillRect(0,0,W,H);const st={t:t==='hl'?'hl':'pen',c:cfg.c,s:cfg.s,p};if(t!=='hl'){st.k=S.pen.k;st.o={th:S.pen.th,sl:S.pen.sl,sm:0.5,ts:S.pen.tp,te:S.pen.tp}}drawStroke(g,st,S.night)}
 function toolPop(anchor){const t=S.tool;
@@ -609,9 +614,9 @@ function toolPop(anchor){const t=S.tool;
   el.querySelector('.cols').onclick=ev=>{const d=ev.target.closest('[data-c]');if(!d)return;cfg.c=d.dataset.c;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.toggle('on',x===d));syncUI();drawPrev()};
   el.querySelector('#pC').oninput=ev=>{cfg.c=ev.target.value;saveS();el.querySelectorAll('.cdot').forEach(x=>x.classList.remove('on'));syncUI();drawPrev()};
   const s=el.querySelector('#pS');s.oninput=()=>{cfg.s=+s.value;s.nextElementSibling.textContent=s.value;saveS();drawPrev()};drawPrev()})}
-$$('.tool').forEach(b=>b.onclick=()=>{if(S.tool===b.dataset.t)toolPop(b);else{closePop();setTool(b.dataset.t)}});
+$$('.tool').forEach(b=>b.onclick=()=>{if(S.tool===b.dataset.t)toolPop(b);else{closePop();setTool(b.dataset.t,'工具列'+(lastPtr?'，'+lastPtr:''))}});
 $('#bSw').onclick=e=>toolPop(e.currentTarget);
-$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
+$('#bUndo').onclick=()=>undo('工具列按鈕'+(lastPtr?'，'+lastPtr:''));$('#bRedo').onclick=()=>redo('工具列按鈕'+(lastPtr?'，'+lastPtr:''));
 $('#bImg').onclick=()=>$('#fImg').click();
 $('#bPrev').onclick=()=>goPage(cur-1);$('#bNext').onclick=()=>goPage(cur+1);
 $('#bAdd').onclick=()=>addPage(cur);
@@ -623,7 +628,7 @@ $('#bMore').onclick=e=>{const a=e.currentTarget;openPop(a,`<div class="ph">翻�
  <label class="mi"><span>只用 Apple Pencil 書寫<small>開啟後手指只會捲動和縮放，手掌碰到螢幕不會留下筆跡</small></span><input type="checkbox" class="tg" id="mPen" ${S.pencilOnly?'checked':''}></label>
  <label class="mi"><span>手指點一下叫出快捷選單<small>需開啟「只用 Apple Pencil 書寫」</small></span><input type="checkbox" class="tg" id="mQuick" ${S.quick?'checked':''}></label>
  <label class="mi"><span>夜間模式下反轉 PDF 顏色</span><input type="checkbox" class="tg" id="mInv" ${S.invertPdf?'checked':''}></label><div class="hr"></div>
- <button class="mi" id="mIns"><span>插入 PDF 頁面</span></button><button class="mi d" id="mDel"><span>刪除這一頁</span></button><button class="mi" id="mPng"><span>匯出這一頁（PNG 圖片）</span></button><button class="mi" id="mPdf1"><span>匯出這一頁（PDF）</span></button><button class="mi" id="mPdf"><span>匯出整本筆記本（PDF）</span></button>
+ <button class="mi" id="mLog"><span>最近的操作紀錄<small>發生奇怪的狀況時，可以看是什麼動作造成的</small></span></button><button class="mi" id="mIns"><span>插入 PDF 頁面</span></button><button class="mi d" id="mDel"><span>刪除這一頁</span></button><button class="mi" id="mPng"><span>匯出這一頁（PNG 圖片）</span></button><button class="mi" id="mPdf1"><span>匯出這一頁（PDF）</span></button><button class="mi" id="mPdf"><span>匯出整本筆記本（PDF）</span></button>
  <p class="hint">手勢：單指點一下＝快捷選單，雙指點一下＝復原，三指點一下＝重做，雙指捏合＝縮放。</p>`,el=>{
  el.querySelector('#mScroll').onclick=ev=>{const b=ev.target.closest('[data-s]');if(!b||S.scroll===b.dataset.s)return;S.scroll=b.dataset.s;saveS();el.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));goPage(cur,true)};
  el.querySelector('#mPaper').onclick=ev=>{const b=ev.target.closest('[data-p]');if(!b)return;pg.paper=b.dataset.p;S.paper=pg.paper;saveS();el.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));render();markDirty()};
@@ -632,6 +637,7 @@ $('#bMore').onclick=e=>{const a=e.currentTarget;openPop(a,`<div class="ph">翻�
  el.querySelector('#mPen').onchange=ev=>{S.pencilOnly=ev.target.checked;S.pencilAuto=false;saveS()};
  el.querySelector('#mQuick').onchange=ev=>{S.quick=ev.target.checked;saveS()};
  el.querySelector('#mInv').onchange=ev=>{S.invertPdf=ev.target.checked;saveS();render()};
+ el.querySelector('#mLog').onclick=()=>{closePop();showLog()};
  el.querySelector('#mDel').onclick=()=>{closePop();delPage(cur)};
  el.querySelector('#mIns').onclick=()=>{closePop();pdfInto=true;$('#fPdf').click()};
  el.querySelector('#mPng').onclick=()=>{closePop();exportPng()};
@@ -652,11 +658,12 @@ function editQuick(){let pen=qPen().slice(),hl=qHl().slice(),selR='pen',selI=0;
   if(d.r){selR=d.r;selI=+d.i}else if(d.m){const j=selI+Number(d.m);if(j>=0&&j<arr.length){[arr[selI],arr[j]]=[arr[j],arr[selI]];selI=j}}else if(d.c){arr[selI]=d.c}else if(d.reset){pen=PEN_C.filter(c=>c!=='#ffffff').slice(0,7);hl=HL_C.slice();selR='pen';selI=0}else return;e.stopPropagation();draw()};
  box.oninput=e=>{if(!e.target.dataset.k)return;const arr=selR==='pen'?pen:hl;arr[selI]=e.target.value;const dot=box.querySelector(`.qrow [data-r="${selR}"][data-i="${selI}"]`);if(dot)dot.style.setProperty('--c',selR==='pen'?nc(e.target.value,S.night):e.target.value)};
  draw()}
-function showQuick(x,y){closePop();quickAt={x,y};const tb=t=>`<button class="ib ${S.tool===t?'on':''}" data-t="${t}" aria-label="${t}"><svg class="i"><use href="#i-${t==='eraser'?'er':t}"/></svg></button>`;
+function showQuick(x,y){closePop();quickAt={x,y};quickOpenedAt=now();log('打開快捷選單（手指點一下）');const tb=t=>`<button class="ib ${S.tool===t?'on':''}" data-t="${t}" aria-label="${t}"><svg class="i"><use href="#i-${t==='eraser'?'er':t}"/></svg></button>`;
  quick.innerHTML=`<div class="qr">${tb('pen')}${tb('hl')}${tb('eraser')}${tb('lasso')}<button class="ib" data-u="u" aria-label="復原"><svg class="i"><use href="#i-undo"/></svg></button></div>${CLIP?'<button class="qp" data-v="1">貼上</button>':''}${navigator.clipboard&&navigator.clipboard.read?'<button class="qp" data-v="2">貼上剪貼簿的圖片</button>':''}<small>鋼筆<button class="qe" data-e="1">編輯顏色</button></small><div class="qc">${qPen().map(c=>`<button class="cdot ${S.tool==='pen'&&S.pen.c===c?'on':''}" data-pc="${c}" style="--c:${nc(c,S.night)}" aria-label="${c}"></button>`).join('')}</div><small>螢光筆</small><div class="qc">${qHl().map(c=>`<button class="cdot ${S.tool==='hl'&&S.hl.c===c?'on':''}" data-hc="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}</div>`;
  quick.hidden=false;const w=quick.offsetWidth,h=quick.offsetHeight;let top=y-h-24;if(top<8)top=y+24;quick.style.left=clamp(x-w/2,8,innerWidth-w-8)+'px';quick.style.top=clamp(top,8,innerHeight-h-8)+'px'}
-quick.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
- if(d.e){hideQuick();editQuick();return}if(d.v){focusAt(quickAt.y);const q=toPage({clientX:quickAt.x,clientY:quickAt.y}),np=inOpenPanel(q);if(np&&d.v==='1')pasteIntoNote(np,q);else if(d.v==='2')pasteSystem(q.x,q.y);else pasteAt(q.x,q.y)}else if(d.t)setTool(d.t);else if(d.u)undo();else if(d.pc){S.pen.c=d.pc;saveS();setTool('pen')}else if(d.hc){S.hl.c=d.hc;saveS();setTool('hl')}hideQuick()});
+let quickOpenedAt=0,quickPtr='';quick.addEventListener('pointerdown',e=>{quickPtr=e.pointerType},true);
+quick.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;if(quickPtr==='pen'&&now()-quickOpenedAt<600){log('擋下：快捷選單剛打開就被筆點到');hideQuick();return}
+ if(d.e){hideQuick();editQuick();return}if(d.v){focusAt(quickAt.y);const q=toPage({clientX:quickAt.x,clientY:quickAt.y}),np=inOpenPanel(q);if(np&&d.v==='1')pasteIntoNote(np,q);else if(d.v==='2')pasteSystem(q.x,q.y);else pasteAt(q.x,q.y)}else if(d.t)setTool(d.t,'快捷選單，'+(quickPtr==='pen'?'筆':'手指'));else if(d.u)undo('快捷選單，'+(quickPtr==='pen'?'筆':'手指'));else if(d.pc){S.pen.c=d.pc;saveS();setTool('pen','快捷選單選顏色')}else if(d.hc){S.hl.c=d.hc;saveS();setTool('hl','快捷選單選顏色')}hideQuick()});
 document.addEventListener('pointerdown',e=>{if(!quick.hidden&&!quick.contains(e.target))hideQuick(true)},true);
 
 /* ---------- fullscreen ---------- */
@@ -667,6 +674,7 @@ $('#bFs').onclick=async()=>{try{if(fsEl()){await (document.exitFullscreen||docum
 const fsSync=()=>{$('#bFs use').setAttribute('href',fsEl()?'#i-fsx':'#i-fs');setTimeout(resize,120)};
 document.addEventListener('fullscreenchange',fsSync);document.addEventListener('webkitfullscreenchange',fsSync);
 
+function showLog(){const f=t=>{const d=new Date(t);return [d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':')};const rows=LOG.slice(-40).reverse().map(([t,m])=>`<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px"><span style="color:var(--mut);font-variant-numeric:tabular-nums">${f(t)}</span><span>${esc(m)}</span></div>`).join('')||'<p>目前還沒有紀錄。</p>';modal({title:'最近的操作紀錄',text:'最新的在最上面。關掉 App 後紀錄會清空。',html:`<div style="max-height:50vh;overflow:auto;margin-bottom:12px">${rows}</div>`,ok:'關閉',cancel:''})}
 /* ---------- pages ---------- */
 function goPage(i,refit){if(!pages.length)return;openNote=null;i=clamp(i,0,pages.length-1);stopInertia();if(act)cancelAct();sel=null;T.clear();gest=null;cursor=null;if(pg&&dirty.has(pg))flush();pg=pages[i];cur=i;nb.last=i;layout();if(vMode()&&!refit&&SW){cam.ty=14-pg._oy*cam.s;clampCam()}else fit();render();syncUI();if(!$('#drawer').hidden)renderDrawer()}
 async function addPage(after){const ref=pages[after];const p=newPage(ref&&!ref.bg?ref.paper:S.paper);pages.splice(after+1,0,p);markDirty(p);await flush();goPage(after+1);toast(`已新增第 ${after+2} 頁`)}

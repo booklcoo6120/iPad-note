@@ -1,5 +1,5 @@
 // 離線用的快取：App 本體優先從網路取得最新版，離線時改用快取
-const CACHE = 'inkbook-v3';
+const CACHE = 'inkbook-v4';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.png', './pdf.min.js', './pdf.worker.min.js', './cmaps.json', './fonts.json'];
 
 self.addEventListener('install', e => {
